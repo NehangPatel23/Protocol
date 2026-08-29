@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+This project is built against /docs/Fitness_Tracker_Master_Prompt.md,
+/docs/Fitness_Tracker_UIUX_Design_Spec.md, and /docs/UI_Consolidation_Brief_v2.md.
+Treat these as the source of truth for features, edge cases, and visual design.
+Follow /docs/Cursor_Build_Plan.md's phase order — do not implement features from
+a later phase while working on an earlier one. When something is ambiguous or
+these docs conflict with a request, ask rather than inventing a default.

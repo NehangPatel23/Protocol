@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/*
+  Design tokens — Fitness Tracker UI/UX Design Spec §4–§5
+  Use theme utilities (bg-base, text-primary, bg-accent, …) rather than raw hex in components.
+*/
+
+:root {
+  /* 4.1 Dark (default) */
+  --bg-base: #0b1120;
+  --bg-surface: #131b2e;
+  --bg-surface-raised: #1b2540;
+  --border-subtle: #26314d;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #5b6b8c;
+
+  /* 4.2 Day accents */
+  --day-push: #1f4e5f;
+  --day-pull: #6d28d9;
+  --day-legs: #0f766e;
+  --day-upper: #b45309;
+  --day-lower: #be123c;
+  --day-rest: #64748b;
+
+  /* 4.3 Semantic — dark */
+  --success-bg: #0b2e24;
+  --success-text: #34d399;
+  --warning-bg: #3a2a0b;
+  --warning-text: #fbbf24;
+  --danger-bg: #3a0e14;
+  --danger-text: #fb7185;
+  --info-bg: #0b2036;
+  --info-text: #60a5fa;
+  --accent: #14b8a6;
+  --accent-foreground: #0b1120;
+
+  color-scheme: dark;
+}
+
+html.light {
+  /* 4.1 Light */
+  --bg-base: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-raised: #ffffff;
+  --border-subtle: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  /* 4.3 Semantic — light */
+  --success-bg: #ecfdf5;
+  --success-text: #065f46;
+  --warning-bg: #fffbeb;
+  --warning-text: #b45309;
+  --danger-bg: #fef2f2;
+  --danger-text: #b91c1c;
+  --info-bg: #eff6ff;
+  --info-text: #1d4ed8;
+  --accent: #0f766e;
+  --accent-foreground: #ffffff;
+
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-base: var(--bg-base);
+  --color-surface: var(--bg-surface);
+  --color-surface-raised: var(--bg-surface-raised);
+  --color-border-subtle: var(--border-subtle);
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+
+  --color-day-push: var(--day-push);
+  --color-day-pull: var(--day-pull);
+  --color-day-legs: var(--day-legs);
+  --color-day-upper: var(--day-upper);
+  --color-day-lower: var(--day-lower);
+  --color-day-rest: var(--day-rest);
+
+  --color-success-bg: var(--success-bg);
+  --color-success: var(--success-text);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning: var(--warning-text);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger: var(--danger-text);
+  --color-info-bg: var(--info-bg);
+  --color-info: var(--info-text);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --font-sans: -apple-system, "SF Pro Text", Inter, "Segoe UI", Roboto,
+    sans-serif;
+}
+
+@layer base {
+  html {
+    height: 100%;
+  }
+
+  body {
+    min-height: 100%;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
