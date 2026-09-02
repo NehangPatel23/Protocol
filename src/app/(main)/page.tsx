@@ -1,10 +1,5 @@
-import { EmptyScreen } from "@/components/EmptyScreen";
+import { HomeDashboard } from "@/components/home/HomeDashboard";
 
 export default function HomePage() {
-  return (
-    <EmptyScreen
-      title="Home"
-      description="Today’s prescription and weekly overview will live here. Phase 0 scaffold — features come next."
-    />
-  );
+  return <HomeDashboard />;
 }

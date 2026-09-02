@@ -67,22 +67,53 @@ interface ProtocolDB extends DBSchema {
 let dbPromise: Promise<IDBPDatabase<ProtocolDB>> | null = null;
 let persistenceAvailable: boolean | null = null;
 
+const IDB_TIMEOUT_MS = 2000;
+
 function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof indexedDB !== "undefined";
 }
 
-async function upgrade(
-  db: IDBPDatabase<ProtocolDB>,
-  oldVersion: number,
-) {
-  // Schema versioning hook — extend with migrations as versions increase.
-  if (oldVersion < 1) {
-    for (const name of STORE_NAMES) {
-      if (!db.objectStoreNames.contains(name)) {
-        db.createObjectStore(name);
-      }
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`[protocol/db] timeout after ${ms}ms: ${label}`));
+    }, ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (err: unknown) => {
+        window.clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
+function ensureStores(db: IDBPDatabase<ProtocolDB>) {
+  for (const name of STORE_NAMES) {
+    if (!db.objectStoreNames.contains(name)) {
+      db.createObjectStore(name);
     }
   }
+}
+
+async function upgrade(
+  db: IDBPDatabase<ProtocolDB>,
+  _oldVersion: number,
+) {
+  // Always ensure stores exist — covers incomplete prior upgrades.
+  ensureStores(db);
+}
+
+export function resetDbConnection(): void {
+  dbPromise = null;
+  persistenceAvailable = null;
 }
 
 export async function getDB(): Promise<IDBPDatabase<ProtocolDB>> {
@@ -93,7 +124,9 @@ export async function getDB(): Promise<IDBPDatabase<ProtocolDB>> {
     dbPromise = openDB<ProtocolDB>(DB_NAME, DB_VERSION, {
       upgrade,
       blocked() {
-        console.warn("[protocol/db] upgrade blocked — close other tabs");
+        console.warn(
+          "[protocol/db] open blocked — another tab may be upgrading",
+        );
       },
       blocking() {
         console.warn("[protocol/db] blocking newer version");
@@ -101,12 +134,21 @@ export async function getDB(): Promise<IDBPDatabase<ProtocolDB>> {
       terminated() {
         dbPromise = null;
       },
+    }).catch((err) => {
+      dbPromise = null;
+      throw err;
     });
   }
-  return dbPromise;
+  try {
+    return await withTimeout(dbPromise, IDB_TIMEOUT_MS, "openDB");
+  } catch (err) {
+    // Drop a hung open so the next call can retry instead of waiting forever.
+    resetDbConnection();
+    throw err;
+  }
 }
 
-/** Detect private browsing / disabled IndexedDB (Safari). */
+/** Detect private browsing / disabled / hung IndexedDB. */
 export async function checkPersistence(): Promise<boolean> {
   if (persistenceAvailable !== null) return persistenceAvailable;
   if (!isBrowser()) {
@@ -115,29 +157,45 @@ export async function checkPersistence(): Promise<boolean> {
   }
   try {
     const db = await getDB();
-    await db.put("meta", Date.now(), "persistenceProbe");
-    await db.get("meta", "persistenceProbe");
+    await withTimeout(
+      db.put("meta", Date.now(), "persistenceProbe"),
+      IDB_TIMEOUT_MS,
+      "persistenceProbe:put",
+    );
+    await withTimeout(
+      db.get("meta", "persistenceProbe"),
+      IDB_TIMEOUT_MS,
+      "persistenceProbe:get",
+    );
     persistenceAvailable = true;
-  } catch {
+  } catch (err) {
+    console.warn("[protocol/db] persistence unavailable", err);
     persistenceAvailable = false;
+    resetDbConnection();
   }
   return persistenceAvailable;
 }
 
 export async function getPrefs(): Promise<Prefs> {
   const db = await getDB();
-  const stored = await db.get("prefs", "user");
+  const stored = await withTimeout(
+    db.get("prefs", "user"),
+    IDB_TIMEOUT_MS,
+    "getPrefs",
+  );
   if (!stored) {
-    await db.put("prefs", DEFAULT_PREFS, "user");
+    await withTimeout(
+      db.put("prefs", DEFAULT_PREFS, "user"),
+      IDB_TIMEOUT_MS,
+      "seedPrefs",
+    );
     return { ...DEFAULT_PREFS };
   }
   return { ...DEFAULT_PREFS, ...stored };
 }
 
-export async function setPrefs(patch: Partial<Prefs>): Promise<Prefs> {
-  const db = await getDB();
-  const current = await getPrefs();
-  const next: Prefs = {
+export function mergePrefs(current: Prefs, patch: Partial<Prefs>): Prefs {
+  return {
     ...current,
     ...patch,
     restTimerDefaults: {
@@ -149,7 +207,13 @@ export async function setPrefs(patch: Partial<Prefs>): Promise<Prefs> {
       ...(patch.pauseMode ?? {}),
     },
   };
-  await db.put("prefs", next, "user");
+}
+
+export async function setPrefs(patch: Partial<Prefs>): Promise<Prefs> {
+  const db = await getDB();
+  const current = await getPrefs();
+  const next = mergePrefs(current, patch);
+  await withTimeout(db.put("prefs", next, "user"), IDB_TIMEOUT_MS, "setPrefs");
   return next;
 }
 
@@ -158,7 +222,11 @@ export async function getStoreValue<T>(
   key: string,
 ): Promise<T | undefined> {
   const db = await getDB();
-  return (await db.get(store, key)) as T | undefined;
+  return (await withTimeout(
+    db.get(store, key),
+    IDB_TIMEOUT_MS,
+    `get:${store}`,
+  )) as T | undefined;
 }
 
 export async function setStoreValue(
@@ -167,7 +235,7 @@ export async function setStoreValue(
   value: unknown,
 ): Promise<void> {
   const db = await getDB();
-  await db.put(store, value, key);
+  await withTimeout(db.put(store, value, key), IDB_TIMEOUT_MS, `put:${store}`);
 }
 
 export async function deleteStoreValue(
@@ -175,5 +243,5 @@ export async function deleteStoreValue(
   key: string,
 ): Promise<void> {
   const db = await getDB();
-  await db.delete(store, key);
+  await withTimeout(db.delete(store, key), IDB_TIMEOUT_MS, `del:${store}`);
 }

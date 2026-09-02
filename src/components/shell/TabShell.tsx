@@ -5,13 +5,13 @@ import { BottomNav, SidebarNav } from "@/components/shell/AppNav";
 import { usePrefs } from "@/components/PrefsProvider";
 
 export function TabShell({ children }: { children: ReactNode }) {
-  const { persistenceOk, ready } = usePrefs();
+  const { persistenceOk } = usePrefs();
 
   return (
     <div className="flex min-h-dvh bg-base text-primary">
       <SidebarNav />
       <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
-        {ready && persistenceOk === false ? (
+        {persistenceOk === false ? (
           <div
             className="border-b border-warning/30 bg-warning-bg px-4 py-2 text-center text-[13px] text-warning"
             role="status"

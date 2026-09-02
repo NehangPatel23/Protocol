@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,15 +9,16 @@ import {
   Home,
   Settings,
   TrendingUp,
+  type LucideIcon,
 } from "lucide-react";
 
-const TABS = [
+const TABS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/program", label: "Program", icon: Dumbbell },
   { href: "/progress", label: "Progress", icon: TrendingUp },
   { href: "/history", label: "History", icon: Calendar },
   { href: "/settings", label: "Settings", icon: Settings },
-] as const;
+];
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
@@ -64,11 +66,23 @@ export function SidebarNav() {
 
   return (
     <aside className="hidden w-56 shrink-0 border-r border-border-subtle bg-surface md:flex md:flex-col">
-      <div className="px-5 pb-2 pt-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">
-          Protocol
-        </p>
-        <p className="mt-1 text-xs text-secondary">Know today&apos;s work.</p>
+      <div className="flex items-center gap-3 px-5 pb-2 pt-6">
+        <span className="relative inline-flex h-7 w-7 shrink-0 overflow-hidden rounded-md ring-1 ring-accent/50">
+          <Image
+            src="/icons/icon-p-192.png"
+            alt=""
+            width={28}
+            height={28}
+            className="h-full w-full object-cover"
+            priority
+          />
+        </span>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">
+            Protocol
+          </p>
+          <p className="mt-0.5 text-xs text-secondary">Know today&apos;s work.</p>
+        </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-3 py-4" aria-label="Main">
         {TABS.map(({ href, label, icon: Icon }) => {
@@ -84,7 +98,10 @@ export function SidebarNav() {
               }`}
               aria-current={active ? "page" : undefined}
             >
-              <Icon className="h-5 w-5 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
+              <Icon
+                className="h-5 w-5 shrink-0"
+                strokeWidth={active ? 2.25 : 1.75}
+              />
               {label}
             </Link>
           );

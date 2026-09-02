@@ -333,4 +333,17 @@ Brainstormed systematically across every feature area. Each one includes the fix
 
 ---
 
+## 8. Decisions made directly with Cursor (post-handoff addendum)
+
+Once implementation started, some product decisions got made directly in Cursor sessions rather than routed back through this doc first. Recording them here so this stays the actual source of truth instead of slowly diverging from what's really being built — anyone (including a future Cursor session, or me reviewing again later) should be able to read this doc alone and know what the app actually does.
+
+- **App name: "Protocol."** Not decided anywhere earlier in this spec; now reflected in `package.json`, the sidebar branding, and presumably user-facing copy. If a tagline or positioning beyond "Strength training, planned and logged with precision" gets decided, add it here too.
+- **Default weight unit: lb (not kg), default distance unit: mi (not km).** This is a real, deliberate call, not an oversight — flagging one implication to watch: the actual program data (`program-data.ts`) is authored in kg, so first-load numbers are converted-and-rounded display values, not the source numbers. Master Prompt §6.9's rounding rule (round to sensible gym increments, never raw floating-point conversion) matters more than usual given this default — verify it's actually implemented, not just specified.
+- **Home-screen icon style: a "P"-only glyph** (matching the "Protocol" name), rather than a dumbbell/generic fitness icon. Applies to the PWA manifest icons and any favicon/touch-icon assets.
+- **Add Exercise / Add Workout entry point exists now, as an intentional placeholder.** A dedicated page (`/program/add`) with disabled "Add exercise" / "Add workout day" actions ships ahead of schedule, specifically so the entry point exists in the nav even though the real implementation (the exercises/assignments schema split and AI-draft-assist button from §2.2a) lands in a later phase. When that phase arrives, build against §2.2a's normalized model — don't let the placeholder's simplicity quietly become the final data shape.
+
+**Process note for anything that gets decided this way going forward:** when a real product decision gets made directly in a Cursor session rather than here first, it's worth a quick message back in this conversation to log it — cheap to do in the moment, expensive to reconstruct later from a chat log once it's been forgotten.
+
+---
+
 **Next step:** build against this spec and the companion UI/UX document.

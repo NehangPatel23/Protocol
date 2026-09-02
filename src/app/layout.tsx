@@ -1,6 +1,22 @@
 import type { Metadata, Viewport } from "next";
+import { IBM_Plex_Mono, Outfit } from "next/font/google";
+import { AlertProvider } from "@/components/alerts/AlertProvider";
 import { PrefsProvider } from "@/components/PrefsProvider";
+import { SplashScreen } from "@/components/SplashScreen";
 import "./globals.css";
+
+const sans = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+  display: "swap",
+});
+
+const mono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-ibm-plex-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -40,9 +56,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <body className="antialiased">
-        <PrefsProvider>{children}</PrefsProvider>
+    <html
+      lang="en"
+      className={`dark ${sans.variable} ${mono.variable}`}
+      suppressHydrationWarning
+    >
+      <body className="font-sans antialiased">
+        <PrefsProvider>
+          <AlertProvider>
+            <SplashScreen />
+            {children}
+          </AlertProvider>
+        </PrefsProvider>
       </body>
     </html>
   );

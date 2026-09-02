@@ -15,13 +15,19 @@
   --text-secondary: #94a3b8;
   --text-muted: #5b6b8c;
 
-  /* 4.2 Day accents */
+  /* 4.2 Day identity — banner fills stay spec hex; -fg is the on-dark chip/label color */
   --day-push: #1f4e5f;
+  --day-push-fg: #38bdf8;
   --day-pull: #6d28d9;
+  --day-pull-fg: #a78bfa;
   --day-legs: #0f766e;
+  --day-legs-fg: #4ade80;
   --day-upper: #b45309;
+  --day-upper-fg: #fbbf24;
   --day-lower: #be123c;
+  --day-lower-fg: #fb7185;
   --day-rest: #64748b;
+  --day-rest-fg: #94a3b8;
 
   /* 4.3 Semantic — dark */
   --success-bg: #0b2e24;
@@ -48,6 +54,13 @@ html.light {
   --text-secondary: #475569;
   --text-muted: #94a3b8;
 
+  --day-push-fg: #1f4e5f;
+  --day-pull-fg: #6d28d9;
+  --day-legs-fg: #0f766e;
+  --day-upper-fg: #b45309;
+  --day-lower-fg: #be123c;
+  --day-rest-fg: #64748b;
+
   /* 4.3 Semantic — light */
   --success-bg: #ecfdf5;
   --success-text: #065f46;
@@ -73,11 +86,17 @@ html.light {
   --color-muted: var(--text-muted);
 
   --color-day-push: var(--day-push);
+  --color-day-push-fg: var(--day-push-fg);
   --color-day-pull: var(--day-pull);
+  --color-day-pull-fg: var(--day-pull-fg);
   --color-day-legs: var(--day-legs);
+  --color-day-legs-fg: var(--day-legs-fg);
   --color-day-upper: var(--day-upper);
+  --color-day-upper-fg: var(--day-upper-fg);
   --color-day-lower: var(--day-lower);
+  --color-day-lower-fg: var(--day-lower-fg);
   --color-day-rest: var(--day-rest);
+  --color-day-rest-fg: var(--day-rest-fg);
 
   --color-success-bg: var(--success-bg);
   --color-success: var(--success-text);
@@ -90,8 +109,8 @@ html.light {
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
 
-  --font-sans: -apple-system, "SF Pro Text", Inter, "Segoe UI", Roboto,
-    sans-serif;
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, monospace;
 }
 
 @layer base {
@@ -106,6 +125,7 @@ html.light {
     font-family: var(--font-sans);
     font-size: 15px;
     line-height: 1.5;
+    letter-spacing: -0.011em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -113,4 +133,181 @@ html.light {
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+}
+
+/* Launch splash — P glyph branding */
+@keyframes protocol-splash-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes protocol-splash-word {
+  0% {
+    opacity: 0;
+    letter-spacing: 0.42em;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    letter-spacing: 0.28em;
+    transform: translateY(0);
+  }
+}
+
+.protocol-splash-glyph {
+  animation: protocol-splash-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.protocol-splash-wordmark {
+  animation: protocol-splash-word 0.7s ease-out 0.35s both;
+}
+
+/* In-app alerts */
+@keyframes protocol-alert-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.protocol-alert {
+  animation: protocol-alert-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes protocol-pending-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.protocol-pending-banner {
+  animation: protocol-pending-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.protocol-alert-viewport {
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 767px) {
+  .protocol-alert-viewport {
+    bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px) + 0.75rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .protocol-alert,
+  .protocol-pending-banner {
+    animation: none;
+  }
+}
+
+/* Skeleton shimmer */
+@keyframes protocol-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.protocol-skeleton {
+  background: linear-gradient(
+    105deg,
+    var(--bg-surface-raised) 0%,
+    var(--bg-surface-raised) 35%,
+    color-mix(in srgb, var(--accent) 14%, var(--bg-surface-raised)) 50%,
+    var(--bg-surface-raised) 65%,
+    var(--bg-surface-raised) 100%
+  );
+  background-size: 200% 100%;
+  animation: protocol-shimmer 1.35s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .protocol-skeleton {
+    animation: none;
+    background: var(--bg-surface-raised);
+  }
+
+  .protocol-splash-glyph,
+  .protocol-splash-wordmark {
+    animation: none;
+  }
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Exercise Detail muscle HUD — visual target: reference_screens/03_exercise_detail.png */
+.muscle-hud {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border-subtle));
+  background-color: color-mix(in srgb, var(--bg-base) 82%, #000);
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--accent) 8%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent) 8%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 18px 18px;
+  border-radius: 12px;
+}
+
+.muscle-hud .anatomy-host svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 280px;
+}
+
+.form-anatomy {
+  background-color: color-mix(in srgb, var(--bg-base) 82%, #000);
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--accent) 8%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent) 8%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 14px 14px;
+}
+
+.form-anatomy .anatomy-host svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 220px;
 }

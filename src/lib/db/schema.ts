@@ -1,7 +1,8 @@
 /** IndexedDB schema + prefs types — Master Prompt §5 / §5.1 */
 
 export const DB_NAME = "protocol";
-export const DB_VERSION = 1;
+/** Bump when stores change — v2 ensures all object stores exist after incomplete v1 opens. */
+export const DB_VERSION = 2;
 
 export type WeightUnit = "kg" | "lb";
 export type DistanceUnit = "km" | "mi";
@@ -49,6 +50,7 @@ export const DEFAULT_PREFS: Prefs = {
 export type StoreName =
   | "meta"
   | "prefs"
+  /** exercises / assignments / cycleOrder — Master Prompt §2.2a; see src/lib/program/types.ts */
   | "program"
   | "sessions"
   | "exerciseHistory"
