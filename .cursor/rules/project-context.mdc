@@ -8,3 +8,9 @@ Follow /docs/Revised_Roadmap.md's stage order for what to build next — this
 supersedes the original Cursor_Build_Plan.md, which is archived for history
 only and should not be used for sequencing. When something is ambiguous or
 these docs conflict with a request, ask rather than inventing a default.
+
+Keep README.md accurate. If a commit would change anything the README states
+as current fact — test counts, roadmap stage, whether a feature is wired in
+the UI, stack versions, or a deployed URL — update README.md in that same
+commit. Re-run `npm test` before changing the test-count badge; do not leave
+the README overstating the app.
