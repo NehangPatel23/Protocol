@@ -1,4 +1,4 @@
-import { getStoreValue, setStoreValue } from "./index";
+import { getDB, getStoreValue, setStoreValue } from "./index";
 import type { CardioLog, SessionRecord } from "./cardio";
 import type { DayKey } from "@/lib/program/types";
 
@@ -6,6 +6,20 @@ export async function loadSession(
   date: string,
 ): Promise<SessionRecord | undefined> {
   return getStoreValue<SessionRecord>("sessions", date);
+}
+
+export async function loadAllSessions(): Promise<Record<string, SessionRecord>> {
+  const db = await getDB();
+  const keys = await db.getAllKeys("sessions");
+  const values = await db.getAll("sessions");
+  const sessions: Record<string, SessionRecord> = {};
+  keys.forEach((key, i) => {
+    const value = values[i];
+    if (value && typeof value === "object") {
+      sessions[String(key)] = value as SessionRecord;
+    }
+  });
+  return sessions;
 }
 
 export async function saveSession(record: SessionRecord): Promise<void> {

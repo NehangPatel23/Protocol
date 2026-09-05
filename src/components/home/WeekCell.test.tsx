@@ -41,6 +41,22 @@ describe("WeekStrip status cells", () => {
     expect(missed.getAttribute("data-icon")).toBe("x");
   });
 
+  it("shows a rest cell as a hollow outline, not a filled box", () => {
+    const calendar: Record<string, CalendarEntry> = {
+      "2026-08-24": { status: "rest", dayKey: "rest" },
+    };
+
+    render(
+      <WeekStrip weekStart={weekStart} today={today} calendar={calendar} />,
+    );
+
+    const rest = screen.getByTestId("week-cell-rest");
+    expect(rest.getAttribute("aria-label")).toBe("Rest");
+    expect(rest.className).toContain("bg-transparent");
+    expect(rest.className).toContain("border-2");
+    expect(rest.className).not.toContain("bg-surface");
+  });
+
   it("shows Missed: [Day name] after tapping a missed cell", () => {
     const calendar: Record<string, CalendarEntry> = {
       "2026-08-26": { status: "missed", dayKey: "pull" },

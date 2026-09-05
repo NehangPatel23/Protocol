@@ -99,6 +99,27 @@ describe("evaluateCycle", () => {
     expect(next.writes).toEqual([]);
     expect(next.state.pendingSince).toBe("2026-08-25");
   });
+
+  it("does not treat the completed training date as Rest after finishing the day before a Rest slot", () => {
+    const started = startProgram("2026-08-24");
+    const afterPush = completeTrainingDay(started, "2026-08-24", CYCLE.length);
+    const afterPull = completeTrainingDay(afterPush, "2026-08-25", CYCLE.length);
+    const afterLegs = completeTrainingDay(afterPull, "2026-08-26", CYCLE.length);
+    expect(afterLegs.pointerIndex).toBe(3);
+    expect(CYCLE[afterLegs.pointerIndex]).toBe("rest");
+
+    const thursday = evaluateCycle(afterLegs, "2026-08-27", CYCLE);
+    expect(thursday.writes).toEqual([]);
+    expect(thursday.state.pointerIndex).toBe(3);
+    expect(thursday.state.pendingSince).toBe("2026-08-27");
+
+    const friday = evaluateCycle(thursday.state, "2026-08-28", CYCLE);
+    expect(friday.writes).toEqual([
+      { date: "2026-08-27", entry: { status: "rest", dayKey: "rest" } },
+    ]);
+    expect(friday.state.pointerIndex).toBe(4);
+    expect(CYCLE[friday.state.pointerIndex]).toBe("upper");
+  });
 });
 
 describe("soreness swap", () => {

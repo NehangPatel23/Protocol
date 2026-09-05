@@ -12,6 +12,12 @@ import {
 } from "react";
 import { usePrefs } from "@/components/PrefsProvider";
 import {
+  clearActiveSession,
+  loadActiveSession,
+  saveActiveSession,
+  type ActiveSessionState,
+} from "@/lib/db/activeSession";
+import {
   loadCalendar,
   loadCycle,
   mergeCalendarWrite,
@@ -20,6 +26,11 @@ import {
   saveCalendar,
   saveCycle,
 } from "@/lib/db/cycle";
+import { persistFinishedWorkout } from "@/lib/session/finishWorkout";
+import {
+  coalesceInflight,
+  persistStartedSession,
+} from "@/lib/session/startSession";
 import { loadSoreness, saveSoreness, upsertSoreness } from "@/lib/db/soreness";
 import type { CardioLog, SorenessRecord } from "@/lib/db/cardio";
 import { loadSession, upsertSessionCardio } from "@/lib/db/sessions";
@@ -63,16 +74,27 @@ export interface ProgramContextValue {
   todayKey: DayKey;
   todaySlot: number;
   ready: boolean;
+  activeSession: ActiveSessionState | null;
   saveNote: (exerciseId: string, text: string) => Promise<void>;
   logSet: (
     exerciseId: string,
-    input: { weightKg: number; reps: number; dayKey?: DayKey },
+    input: {
+      weightKg: number;
+      reps: number;
+      dayKey?: DayKey;
+      date?: string;
+    },
   ) => Promise<void>;
   deleteSet: (exerciseId: string, setId: string) => Promise<void>;
   logRecoveryDay: (cardio?: CardioLog | null) => Promise<void>;
   revertRecoveryDay: () => Promise<void>;
-  logFinisherCardio: (dayKey: DayKey, cardio: CardioLog) => Promise<void>;
+  logFinisherCardio: (dayKey: DayKey, cardio: CardioLog, date?: string) => Promise<void>;
   startProgramToday: () => Promise<void>;
+  startSession: () => Promise<ActiveSessionState>;
+  patchActiveSession: (
+    patch: Partial<ActiveSessionState>,
+  ) => Promise<ActiveSessionState>;
+  finishWorkout: () => Promise<void>;
   daysFor: (exerciseId: string) => DayKey[];
 }
 
@@ -89,8 +111,13 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
   const [soreness, setSoreness] = useState<Record<string, SorenessRecord>>({});
   const today = localDateKey();
   const [cycle, setCycle] = useState<CycleState>(() => initialCycleState(today));
+  const [activeSession, setActiveSession] = useState<ActiveSessionState | null>(
+    null,
+  );
   const [ready, setReady] = useState(false);
   const booted = useRef(false);
+  const startSessionOnce = useRef(coalesceInflight<ActiveSessionState>());
+  const finishingWorkout = useRef(false);
 
   useEffect(() => {
     if (!prefsReady) return;
@@ -130,6 +157,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
           storedCycle,
           storedCalendar,
           storedSoreness,
+          storedSession,
         ] = await Promise.all([
           loadProgram(),
           loadAllNotes(),
@@ -137,6 +165,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
           loadCycle(),
           loadCalendar(),
           loadSoreness(),
+          loadActiveSession(),
         ]);
         if (cancelled) return;
         setProgram(loaded);
@@ -167,6 +196,12 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setCycle(evaluated.state);
         setCalendar(nextCalendar);
+        if (evaluated.state.started === true && storedSession) {
+          setActiveSession(storedSession);
+        } else if (storedSession) {
+          await clearActiveSession();
+          setActiveSession(null);
+        }
         booted.current = true;
         setReady(true);
       } catch (err) {
@@ -209,7 +244,12 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
   const logSet = useCallback(
     async (
       exerciseId: string,
-      input: { weightKg: number; reps: number; dayKey?: DayKey },
+      input: {
+        weightKg: number;
+        reps: number;
+        dayKey?: DayKey;
+        date?: string;
+      },
     ) => {
       const set: HistorySet = {
         id: newSetId(),
@@ -217,7 +257,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
         reps: input.reps,
         loggedAt: new Date().toISOString(),
       };
-      const date = localDateKey();
+      const date = input.date ?? localDateKey();
       const nextEntries = appendSet(
         history[exerciseId] ?? [],
         set,
@@ -318,8 +358,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
   }, [calendar, cycle, persistenceOk, soreness]);
 
   const logFinisherCardio = useCallback(
-    async (dayKey: DayKey, cardio: CardioLog) => {
-      const date = localDateKey();
+    async (dayKey: DayKey, cardio: CardioLog, date = localDateKey()) => {
       if (persistenceOk === false) {
         throw new Error("[protocol/program] persistence unavailable");
       }
@@ -359,6 +398,72 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
     updatePrefs,
   ]);
 
+  const startSession = useCallback(() => {
+    return startSessionOnce.current(async () => {
+      const orderNow =
+        program.cycleOrder.length >= 7 ? program.cycleOrder : CYCLE_DAYS;
+      const dayKey: DayKey = orderNow[cycle.pointerIndex] ?? "push";
+      const stored = await persistStartedSession(
+        {
+          existing: activeSession,
+          date: localDateKey(),
+          dayKey,
+          calendar,
+          programStarted: cycle.started === true,
+        },
+        { save: saveActiveSession, load: loadActiveSession },
+      );
+      setActiveSession(stored);
+      return stored;
+    });
+  }, [activeSession, calendar, cycle.pointerIndex, cycle.started, program.cycleOrder]);
+
+  const patchActiveSession = useCallback(
+    async (patch: Partial<ActiveSessionState>) => {
+      const current = activeSession ?? (await loadActiveSession());
+      if (!current) {
+        throw new Error("[protocol/program] no active session to update");
+      }
+      const next = { ...current, ...patch };
+      await saveActiveSession(next);
+      setActiveSession(next);
+      return next;
+    },
+    [activeSession],
+  );
+
+  const finishWorkout = useCallback(async () => {
+    if (finishingWorkout.current) return;
+    finishingWorkout.current = true;
+    try {
+      const session = activeSession ?? (await loadActiveSession());
+      if (!session) {
+        throw new Error("[protocol/program] no active session to finish");
+      }
+      const orderNow =
+        program.cycleOrder.length >= 7 ? program.cycleOrder : CYCLE_DAYS;
+      const stored = await persistFinishedWorkout(
+        cycle,
+        calendar,
+        session.date,
+        session.dayKey,
+        orderNow.length,
+        {
+          saveCycle,
+          loadCycle,
+          saveCalendar,
+          loadCalendar,
+          clearActiveSession,
+        },
+      );
+      setCycle(stored.cycle);
+      setCalendar(stored.calendar);
+      setActiveSession(null);
+    } finally {
+      finishingWorkout.current = false;
+    }
+  }, [activeSession, calendar, cycle, program.cycleOrder]);
+
   const order =
     program.cycleOrder.length >= 7 ? program.cycleOrder : CYCLE_DAYS;
   const todaySlot = cycle.pointerIndex;
@@ -375,6 +480,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
       todayKey,
       todaySlot,
       ready,
+      activeSession,
       saveNote,
       logSet,
       deleteSet,
@@ -382,6 +488,9 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
       revertRecoveryDay,
       logFinisherCardio,
       startProgramToday,
+      startSession,
+      patchActiveSession,
+      finishWorkout,
       daysFor,
     }),
     [
@@ -394,6 +503,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
       todayKey,
       todaySlot,
       ready,
+      activeSession,
       saveNote,
       logSet,
       deleteSet,
@@ -401,6 +511,9 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
       revertRecoveryDay,
       logFinisherCardio,
       startProgramToday,
+      startSession,
+      patchActiveSession,
+      finishWorkout,
       daysFor,
     ],
   );

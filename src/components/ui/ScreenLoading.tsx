@@ -86,6 +86,51 @@ export function ExerciseDetailSkeleton() {
   );
 }
 
+/** Active session shimmer */
+export function SessionScreenSkeleton() {
+  return (
+    <div
+      className="flex flex-col gap-4 px-4 pt-4"
+      aria-busy="true"
+      aria-label="Loading session"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <Skeleton className="h-11 w-20" rounded="xl" />
+        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-11 w-24" rounded="xl" />
+      </div>
+      <Skeleton className="h-8 w-2/3" />
+      <Skeleton className="h-40 w-full" rounded="xl" />
+      <Skeleton className="h-48 w-full" rounded="xl" />
+    </div>
+  );
+}
+
+/** History calendar + session list shimmer */
+export function HistoryScreenSkeleton() {
+  return (
+    <div
+      className="flex flex-col gap-6"
+      aria-busy="true"
+      aria-label="Loading history"
+    >
+      <PageHeader title="History" />
+      <div className="flex items-center justify-between gap-3">
+        <Skeleton className="h-11 w-11" rounded="xl" />
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-11 w-11" rounded="xl" />
+      </div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {Array.from({ length: 35 }, (_, i) => (
+          <Skeleton key={i} className="aspect-square" rounded="lg" />
+        ))}
+      </div>
+      <Skeleton className="h-24 w-full" rounded="xl" />
+      <Skeleton className="h-24 w-full" rounded="xl" />
+    </div>
+  );
+}
+
 /** Generic settings / list shimmer */
 export function SettingsScreenSkeleton() {
   return (

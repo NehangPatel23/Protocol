@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bandage, Check, Dumbbell, Play, SlidersHorizontal } from "lucide-react";
 import { CardioLogger } from "@/components/program/CardioLogger";
@@ -235,13 +236,18 @@ export function HomeDashboard() {
     logRecoveryDay,
     revertRecoveryDay,
     startProgramToday,
+    activeSession,
+    startSession,
   } = useProgram();
   const { prefs } = usePrefs();
   const alerts = useAlerts();
+  const router = useRouter();
   const [soreOpen, setSoreOpen] = useState(false);
   const [cardioOpen, setCardioOpen] = useState(false);
   const [savingSore, setSavingSore] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [startingSession, setStartingSession] = useState(false);
+  const startSessionLock = useRef(false);
   const [panel, setPanel] = useState<"recovery" | "all" | "lifts">("recovery");
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
@@ -254,6 +260,7 @@ export function HomeDashboard() {
   const lifts = assignedExercisesForDay(program, todayKey);
   const volumeKg = prescribedVolumeKg(program, todayKey);
   const todayRecovery = calendar[today]?.status === "recovery";
+  const todayCompleted = calendar[today]?.status === "completed";
   const todaySettled =
     calendar[today] != null && calendar[today].status !== "blank";
   const canLiftAgain = canRevertRecovery(cycle, today) && todayRecovery;
@@ -346,6 +353,24 @@ export function HomeDashboard() {
       });
     } finally {
       setSavingSore(false);
+    }
+  }
+
+  async function goToSession() {
+    if (startSessionLock.current) return;
+    startSessionLock.current = true;
+    setStartingSession(true);
+    try {
+      await startSession();
+      router.push("/session");
+      // Keep the lock on success so a second tap cannot fire while Home
+      // is still mounted during navigation.
+    } catch {
+      startSessionLock.current = false;
+      setStartingSession(false);
+      alerts.danger("Couldn’t start the session.", {
+        title: "Save failed",
+      });
     }
   }
 
@@ -493,13 +518,26 @@ export function HomeDashboard() {
           </div>
         ) : (
           <div className="mt-6 flex flex-col gap-2">
-            <Link
-              href={`/program?day=${todayKey}&slot=${todaySlot}`}
-              className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 ${chip.border} ${chip.text} text-[14px] font-bold uppercase tracking-[0.08em]`}
-            >
-              <Play className="h-5 w-5 fill-current" aria-hidden />
-              Start session
-            </Link>
+            {todayCompleted && !activeSession ? (
+              <p
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-[14px] font-bold uppercase tracking-[0.08em] text-accent-foreground"
+                data-testid="workout-complete"
+              >
+                <Check className="h-5 w-5" aria-hidden />
+                Workout complete
+              </p>
+            ) : (
+              <button
+                type="button"
+                data-testid="start-session"
+                disabled={startingSession}
+                onClick={() => void goToSession()}
+                className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 ${chip.border} ${chip.text} text-[14px] font-bold uppercase tracking-[0.08em] disabled:opacity-60`}
+              >
+                <Play className="h-5 w-5 fill-current" aria-hidden />
+                {activeSession ? "Resume session" : "Start session"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {

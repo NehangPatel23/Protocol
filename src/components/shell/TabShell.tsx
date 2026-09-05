@@ -1,15 +1,18 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { BottomNav, SidebarNav } from "@/components/shell/AppNav";
 import { usePrefs } from "@/components/PrefsProvider";
 
 export function TabShell({ children }: { children: ReactNode }) {
   const { persistenceOk } = usePrefs();
+  const pathname = usePathname();
+  const sessionMode = pathname === "/session";
 
   return (
     <div className="flex min-h-dvh bg-base text-primary">
-      <SidebarNav />
+      {sessionMode ? null : <SidebarNav />}
       <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
         {persistenceOk === false ? (
           <div
@@ -21,11 +24,15 @@ export function TabShell({ children }: { children: ReactNode }) {
           </div>
         ) : null}
         <main
-          className="mx-auto w-full max-w-3xl flex-1 px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] pt-4 md:max-w-none md:px-6 md:pb-8 md:pt-6"
+          className={
+            sessionMode
+              ? "min-w-0 flex-1"
+              : "mx-auto w-full max-w-3xl flex-1 px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] pt-4 md:max-w-none md:px-6 md:pb-8 md:pt-6"
+          }
         >
           {children}
         </main>
-        <BottomNav />
+        {sessionMode ? null : <BottomNav />}
       </div>
     </div>
   );

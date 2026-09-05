@@ -24,7 +24,7 @@ const ISOLATION_PAIRS: ReadonlyArray<readonly [MuscleGroup, MuscleGroup]> = [
   ["forearms", "biceps"],
 ];
 
-function isCompoundMovement(exercise: LibraryExercise): boolean {
+export function isCompoundMovement(exercise: LibraryExercise): boolean {
   if (exercise.difficultyTags?.includes("compound")) return true;
   const primary = exercise.muscles.primary;
   const secondary = exercise.muscles.secondary ?? [];

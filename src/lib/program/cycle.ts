@@ -131,7 +131,7 @@ export function evaluateCycle(
 
   let index = clampIndex(state.pointerIndex, n);
   let pendingSince = state.pendingSince;
-  let lastCompleted = state.lastCompletedDate;
+  const lastCompleted = state.lastCompletedDate;
   let d = state.lastEvaluatedDate;
   const writes: { date: string; entry: CalendarEntry }[] = [];
 
@@ -139,17 +139,20 @@ export function evaluateCycle(
 
   while (d < today) {
     const key = cycleOrder[index] ?? "rest";
-    if (key === "rest") {
-      writes.push({ date: d, entry: { status: "rest", dayKey: "rest" } });
-      index = (index + 1) % n;
-      pendingSince = addLocalDays(d, 1);
-    } else if (lastCompleted === d) {
-      // completeTrainingDay already advanced the pointer and moved
-      // pendingSince to tomorrow — don't advance again at midnight.
+    // Check lastCompleted before Rest. Finishing Legs (or any day before a
+    // Rest slot) already advanced the pointer onto Rest and moved
+    // pendingSince to tomorrow. If Rest is checked first, midnight would
+    // treat that completed training date as the Rest day and skip Rest
+    // entirely on the following calendar date.
+    if (lastCompleted === d) {
       if (!(pendingSince > d)) {
         index = (index + 1) % n;
         pendingSince = addLocalDays(d, 1);
       }
+    } else if (key === "rest") {
+      writes.push({ date: d, entry: { status: "rest", dayKey: "rest" } });
+      index = (index + 1) % n;
+      pendingSince = addLocalDays(d, 1);
     } else if (d === pendingSince) {
       writes.push({ date: d, entry: { status: "missed", dayKey: key } });
     }

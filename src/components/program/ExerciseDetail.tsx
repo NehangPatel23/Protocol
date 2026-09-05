@@ -23,46 +23,26 @@ import {
   formatHistoryDate,
   localDateKey,
   type HistoryEntry,
-  type HistorySet,
 } from "@/lib/db/history";
 import { DAY_LABELS, isDayKey } from "@/lib/program/days";
 import {
-  epley1RM,
   formatWeightValue,
   kgToDisplay,
   parseRepsFor1RM,
   firstPrescribedKg,
   unitLabel,
 } from "@/lib/program/format";
-import type { DayKey, PRType } from "@/lib/program/types";
+import {
+  bestEst1RM,
+  setScheme,
+  topLoadKg,
+} from "@/lib/program/loggedSets";
+import type { DayKey } from "@/lib/program/types";
 
 function intensityLabel(tags?: string[]): string {
   if (tags?.includes("high-difficulty")) return "HIGH";
   if (tags?.includes("compound")) return "COMP";
   return "—";
-}
-
-function bestEst1RM(sets: HistorySet[]): number | null {
-  let best: number | null = null;
-  for (const s of sets) {
-    const est = epley1RM(s.weightKg, s.reps);
-    if (est == null) continue;
-    if (best === null || est > best) best = est;
-  }
-  return best;
-}
-
-function setScheme(sets: HistorySet[]): string {
-  const reps = sets.map((s) => s.reps);
-  if (reps.length === 0) return "—";
-  if (reps.every((r) => r === reps[0])) return `${sets.length} × ${reps[0]}`;
-  return reps.join(" / ");
-}
-
-function topLoadKg(sets: HistorySet[], prType: PRType): number {
-  const weights = sets.map((s) => s.weightKg);
-  if (prType === "inverse-weight") return Math.min(...weights);
-  return Math.max(...weights);
 }
 
 function lastThirtyDays(entries: HistoryEntry[]): HistoryEntry[] {

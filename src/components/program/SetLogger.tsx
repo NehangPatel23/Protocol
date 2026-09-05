@@ -15,6 +15,8 @@ interface SetLoggerProps {
   prescribedWeightKg?: number | null;
   prescribedReps?: number | null;
   onLog: (input: { weightKg: number; reps: number }) => Promise<void>;
+  /** Override the helper line under Log set. `null` hides it. */
+  hintText?: string | null;
 }
 
 function parseNonNeg(raw: string): number | null {
@@ -31,6 +33,7 @@ export function SetLogger({
   prescribedWeightKg,
   prescribedReps,
   onLog,
+  hintText,
 }: SetLoggerProps) {
   const { prefs } = usePrefs();
   const alerts = useAlerts();
@@ -235,9 +238,10 @@ export function SetLogger({
         <p className="mt-2 text-[13px] text-warning" role="status">
           {hint}
         </p>
-      ) : (
+      ) : hintText === null ? null : (
         <p className="mt-2 text-[13px] text-muted">
-          Saves this set to today. Full workout sessions come later from Home.
+          {hintText ??
+            "Saves this set to today. Full workout sessions come later from Home."}
         </p>
       )}
     </section>
