@@ -3,13 +3,16 @@
  * reimplement pointer math or invent a parallel "mark complete".
  */
 
+import type { SessionRecord } from "@/lib/db/cardio";
 import { markTrainingDayDone } from "@/lib/db/cycle";
 import {
   completeTrainingDay,
+  logChosenDay,
   type CalendarEntry,
   type CycleState,
 } from "@/lib/program/cycle";
 import type { DayKey } from "@/lib/program/types";
+import { sessionFromLogChosenDay } from "@/lib/session/chooseDay";
 
 function isSettled(
   calendar: Record<string, CalendarEntry>,
@@ -45,6 +48,44 @@ export interface FinishWorkoutPersistence {
   ) => Promise<void>;
   loadCalendar: () => Promise<Record<string, CalendarEntry>>;
   clearActiveSession: () => Promise<void>;
+  saveSession?: (record: SessionRecord) => Promise<void>;
+  loadSession?: (date: string) => Promise<SessionRecord | undefined>;
+}
+
+/**
+ * Same `completeTrainingDay` write as a normal finish, then `logChosenDay`
+ * so the original pending date stays blank and the session carries the banner.
+ */
+export function applyOutOfSequenceFinish(
+  cycle: CycleState,
+  calendar: Record<string, CalendarEntry>,
+  date: string,
+  dayKey: DayKey,
+  cycleLength: number,
+  originalPendingDate: string,
+): {
+  cycle: CycleState;
+  calendar: Record<string, CalendarEntry>;
+  session: { date: string; dayKey: DayKey; outOfSequenceBanner: true };
+} {
+  const finished = applyFinishWorkout(
+    cycle,
+    calendar,
+    date,
+    dayKey,
+    cycleLength,
+  );
+  const logged = logChosenDay(
+    finished.calendar,
+    originalPendingDate,
+    date,
+    dayKey,
+  );
+  return {
+    cycle: { ...finished.cycle, outOfSequenceFrom: null },
+    calendar: logged.calendar,
+    session: logged.session,
+  };
 }
 
 /**
@@ -62,6 +103,7 @@ export async function persistFinishedWorkout(
   dayKey: DayKey,
   cycleLength: number,
   persistence: FinishWorkoutPersistence,
+  originalPendingDate?: string | null,
 ): Promise<{ cycle: CycleState; calendar: Record<string, CalendarEntry> }> {
   if (isSettled(calendar, date)) {
     throw new Error(
@@ -69,7 +111,27 @@ export async function persistFinishedWorkout(
     );
   }
 
-  const applied = applyFinishWorkout(cycle, calendar, date, dayKey, cycleLength);
+  const pendingFrom =
+    originalPendingDate != null && originalPendingDate !== ""
+      ? originalPendingDate
+      : null;
+  if (pendingFrom && !persistence.saveSession) {
+    throw new Error(
+      "[protocol/session] out-of-sequence finish needs saveSession",
+    );
+  }
+
+  const applied = pendingFrom
+    ? applyOutOfSequenceFinish(
+        cycle,
+        calendar,
+        date,
+        dayKey,
+        cycleLength,
+        pendingFrom,
+      )
+    : { ...applyFinishWorkout(cycle, calendar, date, dayKey, cycleLength), session: null };
+
   if (applied.calendar[date]?.status !== "completed") {
     throw new Error(
       "[protocol/session] finish did not persist calendar completed",
@@ -97,6 +159,14 @@ export async function persistFinishedWorkout(
   if (storedCycle.lastCompletedDate !== date) {
     throw new Error(
       "[protocol/session] finish did not persist lastCompletedDate",
+    );
+  }
+  if (applied.session) {
+    const existing = persistence.loadSession
+      ? await persistence.loadSession(date)
+      : undefined;
+    await persistence.saveSession!(
+      sessionFromLogChosenDay(existing, applied.session),
     );
   }
   await persistence.clearActiveSession();

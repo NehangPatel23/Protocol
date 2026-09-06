@@ -5,17 +5,21 @@ import {
   mergeCalendarWrite,
 } from "@/lib/db/cycle";
 import {
+  chooseDifferentDay,
   completeTrainingDay,
   evaluateCycle,
   initialCycleState,
   isMissedPickup,
+  logChosenDay,
   startProgram,
   type CalendarEntry,
   type CycleState,
 } from "@/lib/program/cycle";
 import type { DayKey } from "@/lib/program/types";
+import type { SessionRecord } from "@/lib/db/cardio";
 import {
   applyFinishWorkout,
+  applyOutOfSequenceFinish,
   persistFinishedWorkout,
   type FinishWorkoutPersistence,
 } from "./finishWorkout";
@@ -33,13 +37,16 @@ const CYCLE: DayKey[] = [
 function memoryPersistence(): FinishWorkoutPersistence & {
   cycleMem: Map<string, CycleState>;
   calMem: Map<string, Record<string, CalendarEntry>>;
+  sessionMem: Map<string, SessionRecord>;
   sessionCleared: boolean;
 } {
   const cycleMem = new Map<string, CycleState>();
   const calMem = new Map<string, Record<string, CalendarEntry>>();
+  const sessionMem = new Map<string, SessionRecord>();
   const box = {
     cycleMem,
     calMem,
+    sessionMem,
     sessionCleared: false,
     saveCycle: async (state: CycleState) => {
       cycleMem.set("state", { ...state });
@@ -52,6 +59,10 @@ function memoryPersistence(): FinishWorkoutPersistence & {
     clearActiveSession: async () => {
       box.sessionCleared = true;
     },
+    saveSession: async (record: SessionRecord) => {
+      sessionMem.set(record.date, { ...record });
+    },
+    loadSession: async (date: string) => sessionMem.get(date),
   };
   return box;
 }
@@ -375,3 +386,119 @@ describe("persistFinishedWorkout on a picked-up missed day", () => {
     expect(isMissedPickup(stored.cycle, "2026-08-26", "legs")).toBe(false);
   });
 });
+
+describe("out-of-sequence finish uses logChosenDay", () => {
+  it("applyOutOfSequenceFinish equals completeTrainingDay + logChosenDay", () => {
+    const pendingDate = "2026-08-24";
+    const logDate = "2026-08-26";
+    const started = startProgram(pendingDate);
+    const chosen = chooseDifferentDay(
+      started,
+      {},
+      logDate,
+      CYCLE,
+      "legs",
+    );
+    const via = applyOutOfSequenceFinish(
+      chosen.state,
+      chosen.calendar,
+      logDate,
+      "legs",
+      CYCLE.length,
+      pendingDate,
+    );
+    const finished = applyFinishWorkout(
+      chosen.state,
+      chosen.calendar,
+      logDate,
+      "legs",
+      CYCLE.length,
+    );
+    const logged = logChosenDay(
+      finished.calendar,
+      pendingDate,
+      logDate,
+      "legs",
+    );
+
+    expect(via.cycle.pointerIndex).toBe(
+      completeTrainingDay(chosen.state, logDate, CYCLE.length).pointerIndex,
+    );
+    expect(via.calendar).toEqual(logged.calendar);
+    expect(via.session).toEqual(logged.session);
+    expect(via.calendar[pendingDate]).toBeUndefined();
+    expect(via.calendar[pendingDate]?.status).not.toBe("missed");
+    expect(via.calendar[logDate]).toEqual({
+      status: "completed",
+      dayKey: "legs",
+    });
+    expect(via.session.outOfSequenceBanner).toBe(true);
+    expect(via.cycle.outOfSequenceFrom).toBeNull();
+  });
+
+  it("persistFinishedWorkout with originalPendingDate writes the logChosenDay banner", async () => {
+    const pendingDate = "2026-08-24";
+    const logDate = "2026-08-26";
+    const persistence = memoryPersistence();
+    const started = startProgram(pendingDate);
+    const chosen = chooseDifferentDay(
+      started,
+      {},
+      logDate,
+      CYCLE,
+      "legs",
+    );
+    const withFlag = {
+      ...chosen.state,
+      outOfSequenceFrom: pendingDate,
+    };
+
+    const stored = await persistFinishedWorkout(
+      withFlag,
+      chosen.calendar,
+      logDate,
+      "legs",
+      CYCLE.length,
+      persistence,
+      pendingDate,
+    );
+
+    const logged = logChosenDay(
+      applyFinishWorkout(
+        chosen.state,
+        chosen.calendar,
+        logDate,
+        "legs",
+        CYCLE.length,
+      ).calendar,
+      pendingDate,
+      logDate,
+      "legs",
+    );
+
+    expect(stored.calendar).toEqual(logged.calendar);
+    expect(stored.calendar[pendingDate]).toBeUndefined();
+    expect(persistence.sessionMem.get(logDate)?.outOfSequenceBanner).toBe(
+      logged.session.outOfSequenceBanner,
+    );
+    expect(persistence.sessionCleared).toBe(true);
+  });
+
+  it("refuses out-of-sequence finish when saveSession is missing", async () => {
+    const persistence = memoryPersistence();
+    delete persistence.saveSession;
+
+    await expect(
+      persistFinishedWorkout(
+        startProgram("2026-08-24"),
+        {},
+        "2026-08-26",
+        "legs",
+        CYCLE.length,
+        persistence,
+        "2026-08-24",
+      ),
+    ).rejects.toThrow(/saveSession/);
+  });
+});
+

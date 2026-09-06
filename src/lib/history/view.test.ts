@@ -194,4 +194,26 @@ describe("buildSessionList", () => {
       "2026-08-31",
     ]);
   });
+
+  it("surfaces outOfSequenceBanner only from the sessions store, never inferred", () => {
+    const calendar: Record<string, CalendarEntry> = {
+      "2026-09-01": { status: "completed", dayKey: "legs" },
+    };
+    const without = buildSessionList(calendar, {}, {}, program);
+    expect(without[0]?.outOfSequenceBanner).toBeUndefined();
+
+    const withBanner: Record<string, SessionRecord> = {
+      "2026-09-01": {
+        date: "2026-09-01",
+        dayKey: "legs",
+        type: "program",
+        entries: [],
+        cardio: null,
+        complete: true,
+        outOfSequenceBanner: true,
+      },
+    };
+    const listed = buildSessionList(calendar, {}, withBanner, program);
+    expect(listed[0]?.outOfSequenceBanner).toBe(true);
+  });
 });

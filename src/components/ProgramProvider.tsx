@@ -27,13 +27,18 @@ import {
   saveCycle,
 } from "@/lib/db/cycle";
 import { persistFinishedWorkout } from "@/lib/session/finishWorkout";
+import { persistChooseDifferentDay } from "@/lib/session/chooseDay";
+import {
+  persistLongGapJump,
+  persistLongGapPickup,
+} from "@/lib/session/longGap";
 import {
   coalesceInflight,
   persistStartedSession,
 } from "@/lib/session/startSession";
 import { loadSoreness, saveSoreness, upsertSoreness } from "@/lib/db/soreness";
 import type { CardioLog, SorenessRecord } from "@/lib/db/cardio";
-import { loadSession, upsertSessionCardio } from "@/lib/db/sessions";
+import { loadSession, saveSession, upsertSessionCardio } from "@/lib/db/sessions";
 import {
   daysForExercise,
   loadAllNotes,
@@ -91,6 +96,9 @@ export interface ProgramContextValue {
   logFinisherCardio: (dayKey: DayKey, cardio: CardioLog, date?: string) => Promise<void>;
   startProgramToday: () => Promise<void>;
   startSession: () => Promise<ActiveSessionState>;
+  chooseDifferentDay: (dayKey: DayKey) => Promise<void>;
+  pickupLongGap: () => Promise<void>;
+  jumpLongGap: () => Promise<void>;
   patchActiveSession: (
     patch: Partial<ActiveSessionState>,
   ) => Promise<ActiveSessionState>;
@@ -418,6 +426,48 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
     });
   }, [activeSession, calendar, cycle.pointerIndex, cycle.started, program.cycleOrder]);
 
+  const chooseDifferentDay = useCallback(
+    async (dayKey: DayKey) => {
+      if (activeSession) {
+        throw new Error(
+          "[protocol/program] finish or leave the session before changing day",
+        );
+      }
+      const todayKey = localDateKey();
+      const order =
+        program.cycleOrder.length >= 7 ? program.cycleOrder : CYCLE_DAYS;
+      const stored = await persistChooseDifferentDay(
+        cycle,
+        calendar,
+        todayKey,
+        order,
+        dayKey,
+        { saveCycle, loadCycle },
+      );
+      setCycle(stored);
+    },
+    [activeSession, calendar, cycle, program.cycleOrder],
+  );
+
+  const pickupLongGap = useCallback(async () => {
+    const stored = await persistLongGapPickup(cycle, {
+      save: saveCycle,
+      load: loadCycle,
+    });
+    setCycle(stored);
+  }, [cycle]);
+
+  const jumpLongGap = useCallback(async () => {
+    const todayKey = localDateKey();
+    const order =
+      program.cycleOrder.length >= 7 ? program.cycleOrder : CYCLE_DAYS;
+    const stored = await persistLongGapJump(cycle, todayKey, order, {
+      save: saveCycle,
+      load: loadCycle,
+    });
+    setCycle(stored);
+  }, [cycle, program.cycleOrder]);
+
   const patchActiveSession = useCallback(
     async (patch: Partial<ActiveSessionState>) => {
       const current = activeSession ?? (await loadActiveSession());
@@ -454,7 +504,10 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
           saveCalendar,
           loadCalendar,
           clearActiveSession,
+          saveSession,
+          loadSession,
         },
+        cycle.outOfSequenceFrom,
       );
       setCycle(stored.cycle);
       setCalendar(stored.calendar);
@@ -489,6 +542,9 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
       logFinisherCardio,
       startProgramToday,
       startSession,
+      chooseDifferentDay,
+      pickupLongGap,
+      jumpLongGap,
       patchActiveSession,
       finishWorkout,
       daysFor,
@@ -512,6 +568,9 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
       logFinisherCardio,
       startProgramToday,
       startSession,
+      chooseDifferentDay,
+      pickupLongGap,
+      jumpLongGap,
       patchActiveSession,
       finishWorkout,
       daysFor,

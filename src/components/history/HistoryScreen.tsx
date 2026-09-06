@@ -358,6 +358,14 @@ function SessionDetail({
         <h3 className="text-[18px] font-semibold text-primary">
           {recovery ? "Active Recovery" : dayName}
         </h3>
+        {item.outOfSequenceBanner ? (
+          <p
+            className="mt-2 rounded-lg border border-border-subtle bg-base px-3 py-2 text-[13px] text-secondary"
+            data-testid="out-of-sequence-banner"
+          >
+            Logged out of sequence — the pending day was skipped, not missed.
+          </p>
+        ) : null}
         {item.durationMin != null ? (
           <p className="mt-1 font-mono text-[12px] text-muted">
             {item.durationMin} min

@@ -33,6 +33,11 @@ export interface CycleState {
   dayOverride?: { date: string; dayKey: DayKey } | null;
   /** pendingSince value for which the long-gap prompt was dismissed. */
   longGapDismissedFor?: string | null;
+  /**
+   * Original `pendingSince` when the user chose a different day (§6.1).
+   * Finish uses this so `logChosenDay` runs on the real path, then clears it.
+   */
+  outOfSequenceFrom?: string | null;
 }
 
 /** Spec §2.7: prompt after *more than* ~5 unexplained days (fires at 6). */

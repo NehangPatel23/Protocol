@@ -1,3 +1,4 @@
+import { daysBetween } from "./cycle";
 import type { MuscleGroup } from "./types";
 
 export interface MobilitySuggestion {
@@ -63,6 +64,35 @@ const BY_MUSCLE: Record<MuscleGroup, MobilitySuggestion> = {
     how: "Arm straight, pull fingers back, then down. 20s each way.",
   },
 };
+
+/**
+ * Primary muscles from `exerciseHistory` in the trailing window, most
+ * recently trained first. Empty when nothing was logged — callers pass
+ * this straight into `mobilityForMuscles`, which already falls back to
+ * back / chest / quads.
+ */
+export function recentMusclesFromHistory(
+  history: Record<string, Array<{ date: string }>>,
+  primaryMusclesOf: (exerciseId: string) => MuscleGroup[] | undefined,
+  today: string,
+  windowDays = 7,
+): MuscleGroup[] {
+  const last: Partial<Record<MuscleGroup, string>> = {};
+  for (const [id, entries] of Object.entries(history)) {
+    const muscles = primaryMusclesOf(id);
+    if (!muscles?.length) continue;
+    for (const entry of entries) {
+      if (entry.date > today) continue;
+      if (daysBetween(entry.date, today) > windowDays) continue;
+      for (const m of muscles) {
+        if (!last[m] || entry.date > last[m]!) last[m] = entry.date;
+      }
+    }
+  }
+  return (Object.entries(last) as [MuscleGroup, string][])
+    .sort((a, b) => b[1].localeCompare(a[1]) || a[0].localeCompare(b[0]))
+    .map(([muscle]) => muscle);
+}
 
 /** Rest-day mobility matched to muscles trained most in the given window. */
 export function mobilityForMuscles(

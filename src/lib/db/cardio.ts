@@ -68,4 +68,6 @@ export interface SessionRecord {
   durationMin?: number;
   notes?: string;
   complete: boolean;
+  /** Set by `logChosenDay` — History shows the out-of-sequence banner. */
+  outOfSequenceBanner?: true;
 }

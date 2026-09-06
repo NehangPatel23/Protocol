@@ -11,6 +11,9 @@ import { usePrefs } from "@/components/PrefsProvider";
 import { useProgram } from "@/components/ProgramProvider";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HomeScreenSkeleton } from "@/components/ui/ScreenLoading";
+import { ChooseDifferentDay } from "@/components/home/ChooseDifferentDay";
+import { LongGapPrompt } from "@/components/home/LongGapPrompt";
+import { RestDayMobility } from "@/components/home/RestDayMobility";
 import { WeekStrip } from "@/components/home/WeekCell";
 import { formatCardioSummary, type CardioLog } from "@/lib/db/cardio";
 import { assignedExercisesForDay } from "@/lib/db/program";
@@ -26,6 +29,7 @@ import {
   parseRepsFor1RM,
   topPrescribedKg,
 } from "@/lib/program/format";
+import { recentMusclesFromHistory } from "@/lib/program/mobility";
 import {
   MUSCLE_LABELS,
   type DayKey,
@@ -238,6 +242,9 @@ export function HomeDashboard() {
     startProgramToday,
     activeSession,
     startSession,
+    chooseDifferentDay,
+    pickupLongGap,
+    jumpLongGap,
   } = useProgram();
   const { prefs } = usePrefs();
   const alerts = useAlerts();
@@ -247,6 +254,8 @@ export function HomeDashboard() {
   const [savingSore, setSavingSore] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startingSession, setStartingSession] = useState(false);
+  const [choosingDay, setChoosingDay] = useState(false);
+  const [resolvingGap, setResolvingGap] = useState(false);
   const startSessionLock = useRef(false);
   const [panel, setPanel] = useState<"recovery" | "all" | "lifts">("recovery");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -288,6 +297,17 @@ export function HomeDashboard() {
       ),
     [program, history, today, panel, todayRecovery, recoveringMuscles],
   );
+  const restMuscles = useMemo(
+    () =>
+      recentMusclesFromHistory(
+        history,
+        (id) => program.exercises[id]?.muscles.primary,
+        today,
+      ),
+    [history, program.exercises, today],
+  );
+  const cycleOrder =
+    program.cycleOrder.length >= 7 ? program.cycleOrder : CYCLE_DAYS;
   const weekStart = mondayOfWeek(today);
 
   useEffect(() => {
@@ -374,6 +394,40 @@ export function HomeDashboard() {
     }
   }
 
+  async function confirmChooseDay(dayKey: DayKey) {
+    setChoosingDay(true);
+    try {
+      await chooseDifferentDay(dayKey);
+    } catch {
+      alerts.danger("Couldn’t change the day.", { title: "Save failed" });
+      throw new Error("[protocol] chooseDifferentDay failed");
+    } finally {
+      setChoosingDay(false);
+    }
+  }
+
+  async function confirmPickupGap() {
+    setResolvingGap(true);
+    try {
+      await pickupLongGap();
+    } catch {
+      alerts.danger("Couldn’t save that choice.", { title: "Save failed" });
+    } finally {
+      setResolvingGap(false);
+    }
+  }
+
+  async function confirmJumpGap() {
+    setResolvingGap(true);
+    try {
+      await jumpLongGap();
+    } catch {
+      alerts.danger("Couldn’t save that choice.", { title: "Save failed" });
+    } finally {
+      setResolvingGap(false);
+    }
+  }
+
   if (!ready) {
     return <HomeScreenSkeleton />;
   }
@@ -414,6 +468,17 @@ export function HomeDashboard() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader title="Home" priority />
+
+      <LongGapPrompt
+        cycle={cycle}
+        today={today}
+        calendar={calendar}
+        cycleOrder={cycleOrder}
+        pendingDayKey={todayKey}
+        saving={resolvingGap}
+        onPickup={() => void confirmPickupGap()}
+        onJump={() => void confirmJumpGap()}
+      />
 
       {missed && !todayRecovery ? (
         <aside
@@ -490,10 +555,7 @@ export function HomeDashboard() {
         </div>
 
         {isRest ? (
-          <p className="mt-6 text-[15px] text-secondary">
-            No programmed lifts. Recovery mobility matched to last week’s work
-            will show here after you’ve logged a few sessions.
-          </p>
+          <RestDayMobility muscles={restMuscles} />
         ) : todayRecovery ? (
           <div className="mt-6 flex flex-col gap-2">
             <p className="text-[15px] text-secondary">
@@ -552,6 +614,15 @@ export function HomeDashboard() {
               <Dumbbell className="h-4 w-4" aria-hidden />
               Today’s lifts
             </button>
+            {!todayCompleted ? (
+              <ChooseDifferentDay
+                pendingDayKey={todayKey}
+                cycleOrder={cycleOrder}
+                disabled={Boolean(activeSession)}
+                saving={choosingDay}
+                onChoose={confirmChooseDay}
+              />
+            ) : null}
           </div>
         )}
       </section>

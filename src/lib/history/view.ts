@@ -89,6 +89,8 @@ export interface HistorySessionItem {
   /** Only present when the sessions store actually has it (cardio path). */
   durationMin?: number;
   cardioActivity?: string;
+  /** From `logChosenDay` via the sessions store — never inferred. */
+  outOfSequenceBanner?: true;
 }
 
 function exercisesOnDate(
@@ -155,6 +157,9 @@ export function buildSessionList(
     }
     if (session?.cardio?.activity) {
       item.cardioActivity = session.cardio.activity;
+    }
+    if (session?.outOfSequenceBanner === true) {
+      item.outOfSequenceBanner = true;
     }
     items.push(item);
   }

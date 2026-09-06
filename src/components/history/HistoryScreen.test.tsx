@@ -190,6 +190,26 @@ describe("HistoryView session list", () => {
     expect(screen.getByText("1 × 12")).toBeTruthy();
   });
 
+  it("shows the out-of-sequence banner from the sessions store on the logged day", () => {
+    renderMonth(mixedCalendar, {
+      selectedDate: "2026-09-01",
+      sessions: {
+        "2026-09-01": {
+          date: "2026-09-01",
+          dayKey: "push",
+          type: "program",
+          entries: [],
+          cardio: null,
+          complete: true,
+          outOfSequenceBanner: true,
+        },
+      },
+    });
+    expect(screen.getByTestId("out-of-sequence-banner").textContent).toMatch(
+      /skipped, not missed/,
+    );
+  });
+
   it("shows a genuine empty day state for a blank cell, not a missed label", () => {
     renderMonth(mixedCalendar, { selectedDate: "2026-09-05" });
     const empty = screen.getByTestId("history-empty-day");
