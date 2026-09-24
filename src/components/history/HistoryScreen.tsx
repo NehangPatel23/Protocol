@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Calendar, Check, ChevronLeft, ChevronRight, Leaf, Play, X } from "lucide-react";
+import { Calendar, Check, ChevronLeft, ChevronRight, Leaf, Play, Trophy, X } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { WeekCell } from "@/components/home/WeekCell";
 import { usePrefs } from "@/components/PrefsProvider";
@@ -33,10 +33,14 @@ import {
   monthGrid,
   monthTitle,
   MONTH_WEEKDAY_LABELS,
-  sessionForDate,
   sessionsInMonth,
+  visibleMonthCells,
   type HistorySessionItem,
 } from "@/lib/history/view";
+import {
+  formatAvgRpe,
+  formatVolumeDisplay,
+} from "@/lib/history/sessionStats";
 
 export interface HistoryViewProps {
   calendar: Record<string, CalendarEntry>;
@@ -71,7 +75,10 @@ export function HistoryView({
   onPrevMonth,
   onNextMonth,
 }: HistoryViewProps) {
-  const cells = useMemo(() => monthGrid(year, monthIndex), [year, monthIndex]);
+  const cells = useMemo(
+    () => visibleMonthCells(monthGrid(year, monthIndex)),
+    [year, monthIndex],
+  );
   const allSessions = useMemo(
     () => buildSessionList(calendar, history, sessions, program),
     [calendar, history, sessions, program],
@@ -80,9 +87,20 @@ export function HistoryView({
     () => sessionsInMonth(allSessions, year, monthIndex),
     [allSessions, year, monthIndex],
   );
-  const selected = sessionForDate(allSessions, selectedDate);
+  const [expandedDates, setExpandedDates] = useState<string[]>([]);
   const selectedCal = selectedDate ? calendar[selectedDate] : undefined;
   const title = monthTitle(year, monthIndex);
+  const selectedIsSession = monthSessions.some((s) => s.date === selectedDate);
+
+  useEffect(() => {
+    setExpandedDates([]);
+  }, [year, monthIndex]);
+
+  function toggleExpand(date: string) {
+    setExpandedDates((prev) =>
+      prev.includes(date) ? prev.filter((d) => d !== date) : [...prev, date],
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -109,35 +127,6 @@ export function HistoryView({
           </button>
         </div>
 
-        <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-accent text-accent-foreground">
-              <Check className="h-3 w-3" aria-hidden />
-            </span>
-            Completed
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-success-bg text-success">
-              <Leaf className="h-3 w-3" aria-hidden />
-            </span>
-            Recovery
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-danger-bg text-danger">
-              <X className="h-3 w-3" aria-hidden />
-            </span>
-            Missed
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-4 w-4 rounded border-2 border-muted bg-transparent" />
-            Rest
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-4 w-4 rounded bg-base" />
-            Blank
-          </span>
-        </p>
-
         <ol className="mb-1.5 grid grid-cols-7 gap-1.5">
           {MONTH_WEEKDAY_LABELS.map((label, i) => (
             <li
@@ -153,7 +142,7 @@ export function HistoryView({
             <li
               key={cell.date ?? `pad-${i}`}
               className="min-w-0 protocol-heatmap-cell"
-              style={{ animationDelay: `${(i / 42) * 400}ms` }}
+              style={{ animationDelay: `${(i / Math.max(cells.length, 1)) * 400}ms` }}
             >
               {cell.date && cell.dayNum != null ? (
                 <WeekCell
@@ -179,7 +168,40 @@ export function HistoryView({
             </li>
           ))}
         </ol>
+
+        <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-accent text-accent-foreground">
+              <Check className="h-3 w-3" aria-hidden />
+            </span>
+            Completed
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-success-bg text-success">
+              <Leaf className="h-3 w-3" aria-hidden />
+            </span>
+            Recovery
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-danger-bg text-danger">
+              <X className="h-3 w-3" aria-hidden />
+            </span>
+            Missed
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-4 w-4 rounded border-2 border-muted bg-transparent" />
+            Rest
+          </span>
+        </p>
       </section>
+
+      {selectedDate && !selectedIsSession ? (
+        <EmptyDayDetail
+          status={selectedCal?.status}
+          dayKey={selectedCal?.dayKey}
+          date={selectedDate}
+        />
+      ) : null}
 
       <section aria-label="Session log">
         <h2 className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
@@ -203,36 +225,31 @@ export function HistoryView({
           />
         ) : (
           <ul className="flex flex-col gap-2">
-            {monthSessions.map((item) => (
-              <li key={item.date}>
-                <SessionRow
-                  item={item}
-                  selected={item.date === selectedDate}
-                  onSelect={() =>
-                    onSelectDate(item.date === selectedDate ? null : item.date)
-                  }
-                />
-              </li>
-            ))}
+            {monthSessions.map((item) => {
+              const expanded = expandedDates.includes(item.date);
+              return (
+                <li key={item.date}>
+                  <article
+                    className={`overflow-hidden rounded-xl border ${
+                      expanded
+                        ? "border-accent bg-surface-raised"
+                        : "border-border-subtle bg-surface"
+                    }`}
+                  >
+                    <SessionRow
+                      item={item}
+                      selected={expanded}
+                      onSelect={() => toggleExpand(item.date)}
+                    />
+                    {expanded ? (
+                      <SessionDetail item={item} units={units} />
+                    ) : null}
+                  </article>
+                </li>
+              );
+            })}
           </ul>
         )}
-
-        {selectedDate ? (
-          <div className="mt-4">
-            <h3 className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
-              {formatSessionDate(selectedDate)}
-            </h3>
-            {selected ? (
-              <SessionDetail item={selected} units={units} />
-            ) : (
-              <EmptyDayDetail
-                status={selectedCal?.status}
-                dayKey={selectedCal?.dayKey}
-                date={selectedDate}
-              />
-            )}
-          </div>
-        ) : null}
       </section>
     </div>
   );
@@ -300,10 +317,9 @@ function SessionRow({
       onClick={onSelect}
       data-testid={`session-row-${item.date}`}
       aria-pressed={selected}
-      className={`flex min-h-14 w-full flex-col gap-1 rounded-xl border px-4 py-3 text-left transition-colors ${
-        selected
-          ? "border-accent bg-surface-raised"
-          : "border-border-subtle bg-surface hover:bg-surface-raised/60"
+      aria-expanded={selected}
+      className={`flex min-h-14 w-full flex-col gap-1 bg-transparent px-4 py-3 text-left transition-colors ${
+        selected ? "" : "hover:bg-surface-raised/60"
       }`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -336,6 +352,81 @@ function SessionRow({
   );
 }
 
+function SessionStats({
+  item,
+  units,
+}: {
+  item: HistorySessionItem;
+  units: "kg" | "lb";
+}) {
+  const showDuration = item.workoutDurationLabel != null;
+  const showVolume = item.totalVolumeKg != null;
+  const showRpe = item.avgRpe != null;
+  const showPRs = (item.prHitCount ?? 0) > 0;
+  if (!showDuration && !showVolume && !showRpe && !showPRs) return null;
+
+  return (
+    <dl
+      className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-border-subtle px-4 py-3"
+      data-testid={`session-stats-${item.date}`}
+    >
+      {showDuration ? (
+        <div>
+          <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Duration
+          </dt>
+          <dd
+            className="mt-0.5 font-mono text-[18px] font-semibold tabular text-primary"
+            data-testid={`session-duration-${item.date}`}
+          >
+            {item.workoutDurationLabel}
+          </dd>
+        </div>
+      ) : null}
+      {showVolume ? (
+        <div>
+          <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Total Volume
+          </dt>
+          <dd
+            className="mt-0.5 font-mono text-[18px] font-semibold tabular text-primary"
+            data-testid={`session-volume-${item.date}`}
+          >
+            {formatVolumeDisplay(item.totalVolumeKg!, units)}
+          </dd>
+        </div>
+      ) : null}
+      {showRpe ? (
+        <div>
+          <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Avg RPE
+          </dt>
+          <dd
+            className="mt-0.5 font-mono text-[18px] font-semibold tabular text-primary"
+            data-testid={`session-avg-rpe-${item.date}`}
+          >
+            {formatAvgRpe(item.avgRpe!)}
+          </dd>
+        </div>
+      ) : null}
+      {showPRs ? (
+        <div>
+          <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+            PRs Hit
+          </dt>
+          <dd
+            className="mt-0.5 flex items-center gap-1.5 font-mono text-[18px] font-semibold tabular text-warning"
+            data-testid={`session-pr-hits-${item.date}`}
+          >
+            <Trophy className="h-4 w-4" strokeWidth={2} aria-hidden />
+            {item.prHitCount}
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  );
+}
+
 function SessionDetail({
   item,
   units,
@@ -343,43 +434,26 @@ function SessionDetail({
   item: HistorySessionItem;
   units: "kg" | "lb";
 }) {
-  const dayName = item.dayKey ? DAY_LABELS[item.dayKey] : "Session";
   const recovery = item.status === "recovery";
 
   return (
-    <article
-      className="overflow-hidden rounded-xl border border-border-subtle bg-surface"
+    <div
+      className="border-t border-border-subtle"
       data-testid={`session-detail-${item.date}`}
     >
-      <header className="border-b border-border-subtle px-4 py-3">
-        <p className="text-[13px] text-secondary">
-          {formatSessionDate(item.date)}
+      {item.outOfSequenceBanner ? (
+        <p
+          className="mx-4 mt-3 rounded-lg border border-border-subtle bg-base px-3 py-2 text-[13px] text-secondary"
+          data-testid="out-of-sequence-banner"
+        >
+          Logged out of sequence — the pending day was skipped, not missed.
         </p>
-        <h3 className="text-[18px] font-semibold text-primary">
-          {recovery ? "Active Recovery" : dayName}
-        </h3>
-        {item.outOfSequenceBanner ? (
-          <p
-            className="mt-2 rounded-lg border border-border-subtle bg-base px-3 py-2 text-[13px] text-secondary"
-            data-testid="out-of-sequence-banner"
-          >
-            Logged out of sequence — the pending day was skipped, not missed.
-          </p>
-        ) : null}
-        {item.durationMin != null ? (
-          <p className="mt-1 font-mono text-[12px] text-muted">
-            {item.durationMin} min
-            {item.cardioActivity ? ` · ${item.cardioActivity}` : ""}
-          </p>
-        ) : item.cardioActivity ? (
-          <p className="mt-1 font-mono text-[12px] text-muted">
-            {item.cardioActivity}
-          </p>
-        ) : null}
-      </header>
+      ) : null}
+
+      <SessionStats item={item} units={units} />
 
       {item.exercises.length === 0 ? (
-        <p className="px-4 py-6 text-[15px] text-secondary">
+        <p className="px-4 py-4 text-[15px] text-secondary">
           {recovery
             ? "No lifts logged — this day was an active recovery swap."
             : "No sets logged this day."}
@@ -429,7 +503,7 @@ function SessionDetail({
           </table>
         </div>
       )}
-    </article>
+    </div>
   );
 }
 

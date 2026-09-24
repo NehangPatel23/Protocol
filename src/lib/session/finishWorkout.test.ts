@@ -138,6 +138,36 @@ describe("persistFinishedWorkout", () => {
     );
   });
 
+  it("always writes startedAt and finishedAt onto the sessions store", async () => {
+    const persistence = memoryPersistence();
+    persistence.sessionMem.set("2026-08-24", {
+      date: "2026-08-24",
+      dayKey: "push",
+      type: "program",
+      entries: [],
+      cardio: null,
+      complete: false,
+      startedAt: "2026-08-24T18:00:00.000Z",
+    });
+    await persistFinishedWorkout(
+      startProgram("2026-08-24"),
+      {},
+      "2026-08-24",
+      "push",
+      CYCLE.length,
+      persistence,
+      null,
+      {
+        startedAt: "2026-08-24T18:05:00.000Z",
+        finishedAt: "2026-08-24T19:15:00.000Z",
+      },
+    );
+    const rec = persistence.sessionMem.get("2026-08-24");
+    expect(rec?.startedAt).toBe("2026-08-24T18:00:00.000Z");
+    expect(rec?.finishedAt).toBe("2026-08-24T19:15:00.000Z");
+    expect(rec?.complete).toBe(true);
+  });
+
   it("does not return until the calendar re-read shows completed", async () => {
     const cycleMem = new Map<string, CycleState>();
     const calMem = new Map<string, Record<string, CalendarEntry>>();

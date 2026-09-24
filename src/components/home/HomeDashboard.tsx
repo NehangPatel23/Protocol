@@ -600,6 +600,15 @@ export function HomeDashboard() {
                 {activeSession ? "Resume session" : "Start session"}
               </button>
             )}
+            {!todayCompleted ? (
+              <ChooseDifferentDay
+                pendingDayKey={todayKey}
+                cycleOrder={cycleOrder}
+                disabled={Boolean(activeSession)}
+                saving={choosingDay}
+                onChoose={confirmChooseDay}
+              />
+            ) : null}
             <button
               type="button"
               onClick={() => {
@@ -614,15 +623,6 @@ export function HomeDashboard() {
               <Dumbbell className="h-4 w-4" aria-hidden />
               Today’s lifts
             </button>
-            {!todayCompleted ? (
-              <ChooseDifferentDay
-                pendingDayKey={todayKey}
-                cycleOrder={cycleOrder}
-                disabled={Boolean(activeSession)}
-                saving={choosingDay}
-                onChoose={confirmChooseDay}
-              />
-            ) : null}
           </div>
         )}
       </section>

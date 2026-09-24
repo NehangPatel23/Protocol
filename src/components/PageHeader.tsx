@@ -26,16 +26,15 @@ export function PageHeader({
   return (
     <header className="mb-6 flex items-center gap-3">
       {leading}
-      <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[12px] ring-1 ring-border-subtle">
-        <Image
-          src="/icons/icon-p-192.png"
-          alt="Protocol"
-          width={44}
-          height={44}
-          className="h-full w-full object-cover"
-          priority={priority}
-        />
-      </div>
+      <Image
+        src="/icons/icon-p-simple.svg"
+        alt="Protocol"
+        width={44}
+        height={44}
+        className="h-11 w-11 shrink-0"
+        unoptimized
+        priority={priority}
+      />
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent">
           Protocol

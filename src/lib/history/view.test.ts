@@ -9,6 +9,7 @@ import {
   monthGrid,
   sessionForDate,
   sessionsInMonth,
+  visibleMonthCells,
 } from "./view";
 
 const program = buildProgramFromSeed();
@@ -47,6 +48,21 @@ describe("monthGrid", () => {
     expect(cells[30]?.date).toBe("2026-09-30");
     expect(cells[31]?.date).toBeNull();
   });
+
+  it("drops a trailing week of next-month padding so the legend can sit under the last real week", () => {
+    const september = visibleMonthCells(monthGrid(2026, 8));
+    expect(monthGrid(2026, 8)).toHaveLength(42);
+    expect(september).toHaveLength(35);
+    expect(september[34]?.date).toBeNull();
+    expect(september.some((c) => c.date === "2026-09-30")).toBe(true);
+  });
+
+  it("keeps a sixth week when that week still has in-month days", () => {
+    // March 2026: 1st is Sunday, 31st lands in week 6.
+    const march = visibleMonthCells(monthGrid(2026, 2));
+    expect(march).toHaveLength(42);
+    expect(march.some((c) => c.date === "2026-03-31")).toBe(true);
+  });
 });
 
 describe("calendarStatusForDate", () => {
@@ -83,14 +99,17 @@ describe("buildSessionList", () => {
     expect(list[0]?.durationMin).toBeUndefined();
   });
 
-  it("does not invent duration or volume when Stage 1 never stored them", () => {
+  it("does not invent workout duration when timestamps were never stored", () => {
     const calendar: Record<string, CalendarEntry> = {
       "2026-09-01": { status: "completed", dayKey: "push" },
     };
     const history = historyOn("2026-09-01", "push-ups", "push");
     const list = buildSessionList(calendar, history, {}, program);
     expect(list[0]?.durationMin).toBeUndefined();
-    expect("volume" in (list[0] ?? {})).toBe(false);
+    expect(list[0]?.workoutDurationLabel).toBeUndefined();
+    expect(list[0]?.totalVolumeKg).toBe(25 * 10);
+    expect(list[0]?.prHitCount).toBe(1);
+    expect(list[0]?.avgRpe).toBeUndefined();
   });
 
   it("shows duration only when the sessions store actually has durationMin", () => {
@@ -110,6 +129,68 @@ describe("buildSessionList", () => {
     };
     const list = buildSessionList(calendar, {}, sessions, program);
     expect(list[0]?.durationMin).toBe(47);
+  });
+
+  it("shows workout duration from startedAt/finishedAt, not cardio durationMin", () => {
+    const calendar: Record<string, CalendarEntry> = {
+      "2026-09-01": { status: "completed", dayKey: "push" },
+    };
+    const sessions: Record<string, SessionRecord> = {
+      "2026-09-01": {
+        date: "2026-09-01",
+        dayKey: "push",
+        type: "program",
+        entries: [],
+        cardio: null,
+        durationMin: 10,
+        complete: true,
+        startedAt: "2026-09-01T18:00:00.000Z",
+        finishedAt: "2026-09-01T19:15:00.000Z",
+      },
+    };
+    const list = buildSessionList(calendar, {}, sessions, program);
+    expect(list[0]?.durationMin).toBe(10);
+    expect(list[0]?.workoutDurationLabel).toBe("1h 15m");
+  });
+
+  it("keeps a log-time PR hit on the earlier day after a later session moved the wall", () => {
+    const calendar: Record<string, CalendarEntry> = {
+      "2026-09-08": { status: "completed", dayKey: "push" },
+      "2026-09-15": { status: "completed", dayKey: "push" },
+    };
+    const history: Record<string, HistoryEntry[]> = {
+      "chest-press-machine": [
+        {
+          date: "2026-09-08",
+          dayKey: "push",
+          sets: [
+            {
+              id: "early",
+              weightKg: 20,
+              reps: 10,
+              loggedAt: "2026-09-08T18:00:00.000Z",
+            },
+          ],
+        },
+        {
+          date: "2026-09-15",
+          dayKey: "push",
+          sets: [
+            {
+              id: "later",
+              weightKg: 30,
+              reps: 10,
+              loggedAt: "2026-09-15T18:00:00.000Z",
+            },
+          ],
+        },
+      ],
+    };
+    const list = buildSessionList(calendar, history, {}, program);
+    const early = list.find((s) => s.date === "2026-09-08");
+    const later = list.find((s) => s.date === "2026-09-15");
+    expect(early?.prHitCount).toBe(1);
+    expect(later?.prHitCount).toBe(1);
   });
 
   it("lists recovery days even with no logged sets", () => {

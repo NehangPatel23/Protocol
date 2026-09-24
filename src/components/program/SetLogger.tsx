@@ -1,12 +1,21 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Minus, Plus, Trophy } from "lucide-react";
 import { useAlerts } from "@/components/alerts/AlertProvider";
 import { usePrefs } from "@/components/PrefsProvider";
 import { Spinner } from "@/components/ui/Spinner";
 import { displayToKg, kgToDisplay, unitLabel } from "@/lib/program/format";
+import { matchesWarmupPattern, type WarmupPrescription } from "@/lib/progress/prs";
+import { parseRpe } from "@/lib/progress/rpe";
 import type { PRType } from "@/lib/program/types";
+
+export interface LogSetPayload {
+  weightKg: number;
+  reps: number;
+  isWarmup: boolean;
+  rpe?: number;
+}
 
 interface SetLoggerProps {
   prType: PRType;
@@ -14,7 +23,8 @@ interface SetLoggerProps {
   lastReps?: number;
   prescribedWeightKg?: number | null;
   prescribedReps?: number | null;
-  onLog: (input: { weightKg: number; reps: number }) => Promise<void>;
+  warmup?: WarmupPrescription;
+  onLog: (input: LogSetPayload) => Promise<{ isPR?: boolean } | void>;
   /** Override the helper line under Log set. `null` hides it. */
   hintText?: string | null;
 }
@@ -32,6 +42,7 @@ export function SetLogger({
   lastReps,
   prescribedWeightKg,
   prescribedReps,
+  warmup,
   onLog,
   hintText,
 }: SetLoggerProps) {
@@ -50,32 +61,53 @@ export function SetLogger({
   const [hint, setHint] = useState<string | null>(null);
   const [confirmZeroReps, setConfirmZeroReps] = useState(false);
   const [confirmHeavy, setConfirmHeavy] = useState(false);
+  const [warmupForced, setWarmupForced] = useState<boolean | null>(null);
+  const [rpe, setRpe] = useState<number | null>(null);
   const inflight = useRef(false);
-  const lastPayload = useRef<{ weightKg: number; reps: number } | null>(null);
+  const lastPayload = useRef<LogSetPayload | null>(null);
 
   const weightStep = units === "kg" ? 2.5 : 5;
+
+  const parsedWeight = parseNonNeg(weight);
+  const parsedReps = parseNonNeg(reps);
+  const matchesProgrammedWarmup = useMemo(() => {
+    if (!warmup || parsedWeight === null || parsedReps === null) return false;
+    return matchesWarmupPattern(
+      { weightKg: displayToKg(parsedWeight, units), reps: parsedReps },
+      warmup,
+    );
+  }, [parsedReps, parsedWeight, units, warmup]);
+  const isWarmup = warmupForced ?? matchesProgrammedWarmup;
 
   function nudgeWeight(dir: -1 | 1) {
     const current = parseNonNeg(weight) ?? 0;
     const next = Math.max(0, Math.round((current + dir * weightStep) * 2) / 2);
     setWeight(String(next));
     setConfirmHeavy(false);
+    setWarmupForced(null);
   }
 
   function nudgeReps(dir: -1 | 1) {
     const current = parseNonNeg(reps) ?? 0;
     setReps(String(Math.max(0, Math.round(current + dir))));
     setConfirmZeroReps(false);
+    setWarmupForced(null);
   }
 
-  async function persist(payload: { weightKg: number; reps: number }) {
+  async function persist(payload: LogSetPayload) {
     lastPayload.current = payload;
-    await onLog(payload);
+    const result = await onLog(payload);
     alerts.dismiss("set-save-failed");
-    alerts.success(
-      `${payload.reps} × ${kgToDisplay(payload.weightKg, units)} ${unitLabel(units)} logged`,
-      { title: "Set saved" },
-    );
+    const summary = `${payload.reps} × ${kgToDisplay(payload.weightKg, units)} ${unitLabel(units)} logged`;
+    if (result?.isPR) {
+      alerts.success(summary, {
+        title: "New PR",
+        icon: Trophy,
+        durationMs: 3000,
+      });
+    } else {
+      alerts.success(summary, { title: "Set saved" });
+    }
   }
 
   async function log() {
@@ -111,8 +143,16 @@ export function SetLogger({
     inflight.current = true;
     setSaving(true);
     setHint(null);
+    const parsedRpe = parseRpe(rpe);
+    const payload: LogSetPayload = {
+      weightKg,
+      reps: r,
+      isWarmup,
+      ...(parsedRpe != null ? { rpe: parsedRpe } : {}),
+    };
+    lastPayload.current = payload;
     try {
-      await persist({ weightKg, reps: r });
+      await persist(payload);
       setConfirmZeroReps(false);
       setConfirmHeavy(false);
     } catch {
@@ -167,6 +207,7 @@ export function SetLogger({
                 setWeight(e.target.value);
                 setConfirmHeavy(false);
                 setHint(null);
+                setWarmupForced(null);
               }}
               className="tabular min-h-12 min-w-0 flex-1 rounded-lg border border-border-subtle bg-base px-2 text-center font-mono text-[17px] font-semibold text-primary focus:border-accent focus:outline-none"
             />
@@ -201,6 +242,7 @@ export function SetLogger({
                 setReps(e.target.value);
                 setConfirmZeroReps(false);
                 setHint(null);
+                setWarmupForced(null);
               }}
               className="tabular min-h-12 min-w-0 flex-1 rounded-lg border border-border-subtle bg-base px-2 text-center font-mono text-[17px] font-semibold text-primary focus:border-accent focus:outline-none"
             />
@@ -215,6 +257,50 @@ export function SetLogger({
           </div>
         </div>
       </div>
+      <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-3">
+        <input
+          type="checkbox"
+          data-testid="log-warmup"
+          checked={isWarmup}
+          onChange={(e) => setWarmupForced(e.target.checked)}
+          className="h-5 w-5 shrink-0 rounded border-border-subtle accent-accent"
+        />
+        <span className="text-[14px] text-primary">
+          Warm-up set
+          <span className="block text-[13px] text-muted">
+            Excluded from PRs and weekly volume
+          </span>
+        </span>
+      </label>
+      <fieldset className="mt-3" data-testid="log-rpe">
+        <legend className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+          RPE (optional)
+        </legend>
+        <div className="grid grid-cols-5 gap-1.5">
+          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+            const selected = rpe === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                data-testid={`log-rpe-${n}`}
+                aria-pressed={selected}
+                onClick={() => setRpe((prev) => (prev === n ? null : n))}
+                className={`min-h-11 rounded-lg border font-mono text-[14px] font-semibold ${
+                  selected
+                    ? "border-accent bg-accent text-accent-foreground"
+                    : "border-border-subtle bg-base text-secondary"
+                }`}
+              >
+                {n}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-1.5 text-[13px] text-muted">
+          10 is all-out. Skip if you are not tracking effort.
+        </p>
+      </fieldset>
       <button
         type="button"
         onClick={() => void log()}

@@ -147,6 +147,12 @@ describe("HomeDashboard rest-day mobility", () => {
 });
 
 describe("HomeDashboard choose a different day", () => {
+  it("renders the button on a started training day with no calendar entry for today", () => {
+    renderHome({ todayKey: "push" });
+    expect(screen.getByTestId("choose-different-day")).toBeTruthy();
+    expect(screen.getByTestId("start-session")).toBeTruthy();
+  });
+
   it("confirms with the spec copy and calls the provider chooseDifferentDay", () => {
     const { chooseDifferentDay } = renderHome({ todayKey: "push" });
     fireEvent.click(screen.getByTestId("choose-different-day"));
@@ -156,6 +162,35 @@ describe("HomeDashboard choose a different day", () => {
     );
     fireEvent.click(screen.getByTestId("choose-day-confirm"));
     expect(chooseDifferentDay).toHaveBeenCalledWith("legs");
+  });
+
+  it("does not render on a Rest day — that path is RestDayMobility, not a pointer jump", () => {
+    renderHome({ todayKey: "rest", todaySlot: 3 });
+    expect(screen.queryByTestId("choose-different-day")).toBeNull();
+    expect(screen.queryByTestId("start-session")).toBeNull();
+  });
+
+  it("does not render when calendar[today] is already completed", () => {
+    renderHome({
+      todayKey: "push",
+      calendar: {
+        "2026-08-26": { status: "completed", dayKey: "push" },
+      },
+    });
+    expect(screen.getByTestId("workout-complete")).toBeTruthy();
+    expect(screen.queryByTestId("choose-different-day")).toBeNull();
+    expect(screen.queryByTestId("start-session")).toBeNull();
+  });
+
+  it("does not render during an active-recovery day", () => {
+    renderHome({
+      todayKey: "push",
+      calendar: {
+        "2026-08-26": { status: "recovery", dayKey: "rest" },
+      },
+    });
+    expect(screen.queryByTestId("choose-different-day")).toBeNull();
+    expect(screen.queryByTestId("start-session")).toBeNull();
   });
 });
 

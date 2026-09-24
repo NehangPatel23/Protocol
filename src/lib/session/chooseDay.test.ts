@@ -89,4 +89,24 @@ describe("sessionFromLogChosenDay", () => {
     expect(record.dayKey).toBe(logged.session.dayKey);
     expect(record.complete).toBe(true);
   });
+
+  it("keeps startedAt/finishedAt already on the sessions record", () => {
+    const logged = logChosenDay({}, "2026-08-24", "2026-08-26", "legs");
+    const record = sessionFromLogChosenDay(
+      {
+        date: "2026-08-26",
+        dayKey: "push",
+        type: "program",
+        entries: [],
+        cardio: null,
+        complete: false,
+        startedAt: "2026-08-26T18:00:00.000Z",
+        finishedAt: "2026-08-26T19:00:00.000Z",
+      },
+      logged.session,
+    );
+    expect(record.startedAt).toBe("2026-08-26T18:00:00.000Z");
+    expect(record.finishedAt).toBe("2026-08-26T19:00:00.000Z");
+    expect(record.outOfSequenceBanner).toBe(true);
+  });
 });

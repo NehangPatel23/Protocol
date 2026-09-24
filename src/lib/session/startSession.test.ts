@@ -40,6 +40,32 @@ describe("coalesceInflight", () => {
   });
 });
 
+describe("persistStartedSession timestamps", () => {
+  it("writes startedAt onto the sessions store on the real start path", async () => {
+    const persistence = memorySession();
+    const sessionMem = new Map<string, import("@/lib/db/cardio").SessionRecord>();
+    const stored = await persistStartedSession(
+      {
+        existing: null,
+        date: "2026-09-01",
+        dayKey: "push",
+        calendar: {},
+        programStarted: true,
+      },
+      {
+        ...persistence,
+        saveSession: async (record) => {
+          sessionMem.set(record.date, { ...record });
+        },
+        loadSession: async (date) => sessionMem.get(date),
+      },
+    );
+    expect(stored.startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(sessionMem.get("2026-09-01")?.startedAt).toBe(stored.startedAt);
+    expect(sessionMem.get("2026-09-01")?.complete).toBe(false);
+  });
+});
+
 describe("persistStartedSession", () => {
   it("returns the existing session and does not write a second one", async () => {
     const persistence = memorySession();

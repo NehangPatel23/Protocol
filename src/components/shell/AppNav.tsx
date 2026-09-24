@@ -67,16 +67,15 @@ export function SidebarNav() {
   return (
     <aside className="hidden w-56 shrink-0 border-r border-border-subtle bg-surface md:flex md:flex-col">
       <div className="flex items-center gap-3 px-5 pb-2 pt-6">
-        <span className="relative inline-flex h-7 w-7 shrink-0 overflow-hidden rounded-md ring-1 ring-accent/50">
-          <Image
-            src="/icons/icon-p-192.png"
-            alt=""
-            width={28}
-            height={28}
-            className="h-full w-full object-cover"
-            priority
-          />
-        </span>
+        <Image
+          src="/icons/icon-p-simple.svg"
+          alt=""
+          width={28}
+          height={28}
+          className="h-7 w-7 shrink-0"
+          unoptimized
+          priority
+        />
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">
             Protocol

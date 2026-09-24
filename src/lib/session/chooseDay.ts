@@ -3,7 +3,7 @@
  * Calls `chooseDifferentDay` / `logChosenDay`. Does not reimplement skip-vs-miss.
  */
 
-import type { SessionRecord } from "@/lib/db/cardio";
+import { mergeSessionRecord, type SessionRecord } from "@/lib/db/cardio";
 import {
   chooseDifferentDay,
   type CalendarEntry,
@@ -66,15 +66,10 @@ export function sessionFromLogChosenDay(
   existing: SessionRecord | undefined,
   logged: { date: string; dayKey: DayKey; outOfSequenceBanner: true },
 ): SessionRecord {
-  return {
+  return mergeSessionRecord(existing, {
     date: logged.date,
     dayKey: logged.dayKey,
-    type: existing?.type ?? "program",
-    entries: existing?.entries ?? [],
-    cardio: existing?.cardio ?? null,
-    durationMin: existing?.durationMin,
-    notes: existing?.notes,
     complete: true,
     outOfSequenceBanner: logged.outOfSequenceBanner,
-  };
+  });
 }

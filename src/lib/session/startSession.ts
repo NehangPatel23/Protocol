@@ -7,6 +7,7 @@ import {
   createActiveSession,
   type ActiveSessionState,
 } from "@/lib/db/activeSession";
+import { mergeSessionRecord, type SessionRecord } from "@/lib/db/cardio";
 import type { CalendarEntry } from "@/lib/program/cycle";
 import type { DayKey } from "@/lib/program/types";
 
@@ -35,6 +36,8 @@ export interface StartSessionInput {
 export interface StartSessionPersistence {
   save: (state: ActiveSessionState) => Promise<void>;
   load: () => Promise<ActiveSessionState | undefined>;
+  saveSession?: (record: SessionRecord) => Promise<void>;
+  loadSession?: (date: string) => Promise<SessionRecord | undefined>;
 }
 
 export async function persistStartedSession(
@@ -66,6 +69,19 @@ export async function persistStartedSession(
   const stored = await persistence.load();
   if (!stored || stored.date !== input.date || stored.dayKey !== input.dayKey) {
     throw new Error("[protocol/program] session start did not persist");
+  }
+  if (persistence.saveSession) {
+    const existing = persistence.loadSession
+      ? await persistence.loadSession(stored.date)
+      : undefined;
+    await persistence.saveSession(
+      mergeSessionRecord(existing, {
+        date: stored.date,
+        dayKey: stored.dayKey,
+        startedAt: stored.startedAt,
+        complete: existing?.complete ?? false,
+      }),
+    );
   }
   return stored;
 }

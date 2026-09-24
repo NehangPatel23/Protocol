@@ -12,6 +12,7 @@ import {
   type CalendarStatus,
 } from "@/lib/program/cycle";
 import type { DayKey, PRType, ProgramRecord } from "@/lib/program/types";
+import { sessionDetailStats } from "./sessionStats";
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"] as const;
 
@@ -65,6 +66,20 @@ export function monthGrid(year: number, monthIndex: number): MonthCell[] {
   return cells;
 }
 
+/**
+ * Trailing weeks that are only next-month padding collapse so the legend
+ * can sit under the last week that actually has dates.
+ */
+export function visibleMonthCells(cells: MonthCell[]): MonthCell[] {
+  const next = [...cells];
+  while (next.length >= 14) {
+    const week = next.slice(-7);
+    if (week.some((cell) => cell.date != null)) break;
+    next.length -= 7;
+  }
+  return next;
+}
+
 export function calendarStatusForDate(
   calendar: Record<string, CalendarEntry>,
   date: string | null,
@@ -91,6 +106,14 @@ export interface HistorySessionItem {
   cardioActivity?: string;
   /** From `logChosenDay` via the sessions store — never inferred. */
   outOfSequenceBanner?: true;
+  /** Elapsed Start → Finish, only when both timestamps were stored. */
+  workoutDurationLabel?: string;
+  /** Working-set weight × reps that day. Derived, not stored. */
+  totalVolumeKg?: number;
+  /** Mean of sets that stored RPE. Omitted when none did. */
+  avgRpe?: number;
+  /** Historical PR hits at log-time. Omitted when zero. */
+  prHitCount?: number;
 }
 
 function exercisesOnDate(
@@ -160,6 +183,25 @@ export function buildSessionList(
     }
     if (session?.outOfSequenceBanner === true) {
       item.outOfSequenceBanner = true;
+    }
+    const stats = sessionDetailStats(
+      date,
+      exercises,
+      history,
+      program,
+      session,
+    );
+    if (stats.workoutDurationLabel) {
+      item.workoutDurationLabel = stats.workoutDurationLabel;
+    }
+    if (stats.totalVolumeKg != null) {
+      item.totalVolumeKg = stats.totalVolumeKg;
+    }
+    if (stats.avgRpe != null) {
+      item.avgRpe = stats.avgRpe;
+    }
+    if (stats.prHitCount != null) {
+      item.prHitCount = stats.prHitCount;
     }
     items.push(item);
   }

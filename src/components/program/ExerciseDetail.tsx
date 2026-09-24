@@ -30,6 +30,7 @@ import {
   kgToDisplay,
   parseRepsFor1RM,
   firstPrescribedKg,
+  epley1RM,
   unitLabel,
 } from "@/lib/program/format";
 import {
@@ -212,6 +213,7 @@ export function ExerciseDetail({ exerciseId, dayKey }: ExerciseDetailProps) {
         lastReps={lastSet?.reps}
         prescribedWeightKg={prescribedKg}
         prescribedReps={prescribedReps}
+        warmup={assignment?.warmup}
         onLog={(input) => logSet(exercise.id, { ...input, dayKey: day })}
       />
 
@@ -234,6 +236,14 @@ export function ExerciseDetail({ exerciseId, dayKey }: ExerciseDetailProps) {
                       : `${kgToDisplay(s.weightKg, units)} ${unitLabel(units)}`}
                   </span>
                   <span className="text-secondary"> × {s.reps}</span>
+                  {s.rpe != null ? (
+                    <span className="ml-2 text-[13px] text-muted">RPE {s.rpe}</span>
+                  ) : null}
+                  {s.isWarmup ? (
+                    <span className="ml-2 font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                      WU
+                    </span>
+                  ) : null}
                 </p>
                 <button
                   type="button"
@@ -251,6 +261,8 @@ export function ExerciseDetail({ exerciseId, dayKey }: ExerciseDetailProps) {
                                 weightKg: snapshot.weightKg,
                                 reps: snapshot.reps,
                                 dayKey: day,
+                                isWarmup: snapshot.isWarmup,
+                                rpe: snapshot.rpe,
                               });
                               alerts.success("Set restored");
                             },

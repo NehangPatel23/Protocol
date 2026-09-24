@@ -3,7 +3,7 @@
  * reimplement pointer math or invent a parallel "mark complete".
  */
 
-import type { SessionRecord } from "@/lib/db/cardio";
+import { mergeSessionRecord, type SessionRecord } from "@/lib/db/cardio";
 import { markTrainingDayDone } from "@/lib/db/cycle";
 import {
   completeTrainingDay,
@@ -13,6 +13,11 @@ import {
 } from "@/lib/program/cycle";
 import type { DayKey } from "@/lib/program/types";
 import { sessionFromLogChosenDay } from "@/lib/session/chooseDay";
+
+export interface SessionClock {
+  startedAt: string;
+  finishedAt: string;
+}
 
 function isSettled(
   calendar: Record<string, CalendarEntry>,
@@ -104,6 +109,7 @@ export async function persistFinishedWorkout(
   cycleLength: number,
   persistence: FinishWorkoutPersistence,
   originalPendingDate?: string | null,
+  clock?: SessionClock,
 ): Promise<{ cycle: CycleState; calendar: Record<string, CalendarEntry> }> {
   if (isSettled(calendar, date)) {
     throw new Error(
@@ -161,12 +167,21 @@ export async function persistFinishedWorkout(
       "[protocol/session] finish did not persist lastCompletedDate",
     );
   }
-  if (applied.session) {
+  if (persistence.saveSession) {
     const existing = persistence.loadSession
       ? await persistence.loadSession(date)
       : undefined;
-    await persistence.saveSession!(
-      sessionFromLogChosenDay(existing, applied.session),
+    const withBanner = applied.session
+      ? sessionFromLogChosenDay(existing, applied.session)
+      : existing;
+    await persistence.saveSession(
+      mergeSessionRecord(withBanner, {
+        date,
+        dayKey,
+        complete: true,
+        startedAt: clock?.startedAt,
+        finishedAt: clock?.finishedAt,
+      }),
     );
   }
   await persistence.clearActiveSession();

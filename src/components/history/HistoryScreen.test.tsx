@@ -176,14 +176,35 @@ describe("HistoryView session list", () => {
     expect(screen.getByTestId("session-row-2026-09-03")).toBeTruthy();
   });
 
-  it("opens session detail with the logged sets when a session row is tapped", () => {
-    const { onSelectDate } = renderMonth(mixedCalendar);
+  it("opens session detail inline under the tapped card, not at the end of the list", () => {
+    renderMonth(mixedCalendar);
     fireEvent.click(screen.getByTestId("session-row-2026-09-01"));
-    expect(onSelectDate).toHaveBeenCalledWith("2026-09-01");
+    const row = screen.getByTestId("session-row-2026-09-01");
+    const detail = screen.getByTestId("session-detail-2026-09-01");
+    expect(row.closest("article")).toBe(detail.closest("article"));
+    expect(detail.tagName).toBe("DIV");
+    expect(detail.className).toContain("border-t");
+    expect(detail.className).not.toContain("rounded-xl");
+    expect(detail.closest("article")?.className).toContain("border-accent");
+    expect(screen.getByTestId("session-exercise-chest-press-machine")).toBeTruthy();
+    expect(screen.getByText("Chest Press Machine")).toBeTruthy();
+    expect(screen.getByText("1 × 12")).toBeTruthy();
   });
 
-  it("renders exercise sets in the detail table for the selected day", () => {
-    renderMonth(mixedCalendar, { selectedDate: "2026-09-01" });
+  it("keeps an already-expanded card open when a second card is tapped", () => {
+    renderMonth(mixedCalendar);
+    fireEvent.click(screen.getByTestId("session-row-2026-09-01"));
+    fireEvent.click(screen.getByTestId("session-row-2026-09-03"));
+    expect(screen.getByTestId("session-detail-2026-09-01")).toBeTruthy();
+    expect(screen.getByTestId("session-detail-2026-09-03")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("session-row-2026-09-01"));
+    expect(screen.queryByTestId("session-detail-2026-09-01")).toBeNull();
+    expect(screen.getByTestId("session-detail-2026-09-03")).toBeTruthy();
+  });
+
+  it("renders exercise sets in the detail table for the expanded day", () => {
+    renderMonth(mixedCalendar);
+    fireEvent.click(screen.getByTestId("session-row-2026-09-01"));
     expect(screen.getByTestId("session-detail-2026-09-01")).toBeTruthy();
     expect(screen.getByTestId("session-exercise-chest-press-machine")).toBeTruthy();
     expect(screen.getByText("Chest Press Machine")).toBeTruthy();
@@ -192,7 +213,6 @@ describe("HistoryView session list", () => {
 
   it("shows the out-of-sequence banner from the sessions store on the logged day", () => {
     renderMonth(mixedCalendar, {
-      selectedDate: "2026-09-01",
       sessions: {
         "2026-09-01": {
           date: "2026-09-01",
@@ -205,6 +225,7 @@ describe("HistoryView session list", () => {
         },
       },
     });
+    fireEvent.click(screen.getByTestId("session-row-2026-09-01"));
     expect(screen.getByTestId("out-of-sequence-banner").textContent).toMatch(
       /skipped, not missed/,
     );
@@ -251,5 +272,131 @@ describe("HistoryView session list", () => {
 
     expect(screen.queryByTestId("session-row-2026-09-01")).toBeNull();
     expect(screen.getByTestId("session-row-2026-09-03")).toBeTruthy();
+  });
+
+  it("shows duration, volume, avg RPE, and a PR-hit count on an expanded session", () => {
+    const sets = [
+      {
+        id: "s1",
+        weightKg: 20,
+        reps: 10,
+        rpe: 7,
+        loggedAt: "2026-09-08T18:10:00.000Z",
+      },
+    ];
+    renderMonth(
+      { "2026-09-08": { status: "completed", dayKey: "push" } },
+      {
+        today: "2026-09-23",
+        history: {
+          "chest-press-machine": [{ date: "2026-09-08", dayKey: "push", sets }],
+        },
+        sessions: {
+          "2026-09-08": {
+            date: "2026-09-08",
+            dayKey: "push",
+            type: "program",
+            entries: [],
+            cardio: null,
+            complete: true,
+            startedAt: "2026-09-08T18:00:00.000Z",
+            finishedAt: "2026-09-08T19:15:00.000Z",
+          },
+        },
+      },
+    );
+    fireEvent.click(screen.getByTestId("session-row-2026-09-08"));
+    expect(screen.getByTestId("session-duration-2026-09-08").textContent).toBe(
+      "1h 15m",
+    );
+    expect(screen.getByTestId("session-volume-2026-09-08").textContent).toMatch(
+      /lb/,
+    );
+    expect(screen.getByTestId("session-avg-rpe-2026-09-08").textContent).toBe(
+      "7",
+    );
+    expect(screen.getByTestId("session-pr-hits-2026-09-08").textContent).toMatch(
+      /1/,
+    );
+  });
+
+  it("still shows a PR hit on the earlier day after a later session moved the wall", () => {
+    renderMonth(
+      {
+        "2026-09-08": { status: "completed", dayKey: "push" },
+        "2026-09-15": { status: "completed", dayKey: "push" },
+      },
+      {
+        today: "2026-09-23",
+        history: {
+          "chest-press-machine": [
+            {
+              date: "2026-09-08",
+              dayKey: "push",
+              sets: [
+                {
+                  id: "early",
+                  weightKg: 20,
+                  reps: 10,
+                  rpe: 7,
+                  loggedAt: "2026-09-08T18:00:00.000Z",
+                },
+              ],
+            },
+            {
+              date: "2026-09-15",
+              dayKey: "push",
+              sets: [
+                {
+                  id: "later",
+                  weightKg: 30,
+                  reps: 10,
+                  rpe: 8,
+                  loggedAt: "2026-09-15T18:00:00.000Z",
+                },
+              ],
+            },
+          ],
+        },
+        sessions: {
+          "2026-09-08": {
+            date: "2026-09-08",
+            dayKey: "push",
+            type: "program",
+            entries: [],
+            cardio: null,
+            complete: true,
+            startedAt: "2026-09-08T18:00:00.000Z",
+            finishedAt: "2026-09-08T19:15:00.000Z",
+          },
+          "2026-09-15": {
+            date: "2026-09-15",
+            dayKey: "push",
+            type: "program",
+            entries: [],
+            cardio: null,
+            complete: true,
+            startedAt: "2026-09-15T18:00:00.000Z",
+            finishedAt: "2026-09-15T19:00:00.000Z",
+          },
+        },
+      },
+    );
+    fireEvent.click(screen.getByTestId("session-row-2026-09-08"));
+    fireEvent.click(screen.getByTestId("session-row-2026-09-15"));
+    expect(screen.getByTestId("session-pr-hits-2026-09-08").textContent).toMatch(
+      /1/,
+    );
+    expect(screen.getByTestId("session-pr-hits-2026-09-15").textContent).toMatch(
+      /1/,
+    );
+  });
+
+  it("omits avg RPE and PRs Hit when there is nothing to show", () => {
+    renderMonth(mixedCalendar);
+    fireEvent.click(screen.getByTestId("session-row-2026-09-03"));
+    expect(screen.queryByTestId("session-avg-rpe-2026-09-03")).toBeNull();
+    expect(screen.queryByTestId("session-pr-hits-2026-09-03")).toBeNull();
+    expect(screen.queryByTestId("session-duration-2026-09-03")).toBeNull();
   });
 });

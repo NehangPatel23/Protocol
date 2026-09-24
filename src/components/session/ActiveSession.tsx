@@ -232,9 +232,10 @@ export function ActiveSession() {
               lastReps={lastSet?.reps}
               prescribedWeightKg={firstPrescribedKg(assignment.weight)}
               prescribedReps={parseRepsFor1RM(assignment.reps)}
+              warmup={assignment.warmup}
               hintText="Saves this set immediately — rest starts after."
               onLog={async (input) => {
-                await logSet(exercise.id, {
+                const result = await logSet(exercise.id, {
                   ...input,
                   dayKey: activeSession.dayKey,
                   date: activeSession.date,
@@ -245,6 +246,7 @@ export function ActiveSession() {
                 );
                 const rest = replaceRest(duration, Date.now());
                 await patchActiveSession(rest);
+                return result;
               }}
             />
             {todayEntry && todayEntry.sets.length > 0 ? (
@@ -266,6 +268,16 @@ export function ActiveSession() {
                             : `${kgToDisplay(s.weightKg, units)} ${unitLabel(units)}`}
                         </span>
                         <span className="text-secondary"> × {s.reps}</span>
+                        {s.rpe != null ? (
+                          <span className="ml-2 text-[13px] text-muted">
+                            RPE {s.rpe}
+                          </span>
+                        ) : null}
+                        {s.isWarmup ? (
+                          <span className="ml-2 font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                            WU
+                          </span>
+                        ) : null}
                       </p>
                       <button
                         type="button"
@@ -284,6 +296,8 @@ export function ActiveSession() {
                                       reps: snapshot.reps,
                                       dayKey: activeSession.dayKey,
                                       date: activeSession.date,
+                                      isWarmup: snapshot.isWarmup,
+                                      rpe: snapshot.rpe,
                                     });
                                     alerts.success("Set restored");
                                   },

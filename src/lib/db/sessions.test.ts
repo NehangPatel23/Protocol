@@ -47,4 +47,20 @@ describe("upsertSessionCardio", () => {
       }),
     );
   });
+
+  it("keeps startedAt already written by Start Session", async () => {
+    getStoreValue.mockResolvedValue({
+      date: "2026-08-31",
+      dayKey: "push",
+      type: "program",
+      entries: [],
+      cardio: null,
+      complete: false,
+      startedAt: "2026-08-31T18:00:00.000Z",
+    });
+    const saved = await upsertSessionCardio("2026-08-31", "push", CARDIO);
+    expect(saved.startedAt).toBe("2026-08-31T18:00:00.000Z");
+    expect(saved.cardio).toEqual(CARDIO);
+    expect(saved.durationMin).toBe(10);
+  });
 });

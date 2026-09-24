@@ -55,6 +55,15 @@ import {
   type HistoryEntry,
   type HistorySet,
 } from "@/lib/db/history";
+import { deletePR, loadAllPRs, savePR } from "@/lib/db/prs";
+import {
+  bestPRFromHistory,
+  setEstablishesPR,
+  shouldFlagWarmup,
+  warmupPrescriptionFor,
+  type PersonalRecord,
+} from "@/lib/progress/prs";
+import { parseRpe } from "@/lib/progress/rpe";
 import {
   bootCycle,
   initialCycleState,
@@ -69,10 +78,24 @@ import { CYCLE_DAYS } from "@/lib/program/days";
 import { buildProgramFromSeed, validateProgram } from "@/lib/program/seed";
 import type { DayKey, ProgramRecord } from "@/lib/program/types";
 
+export interface LogSetInput {
+  weightKg: number;
+  reps: number;
+  dayKey?: DayKey;
+  date?: string;
+  isWarmup?: boolean;
+  rpe?: number;
+}
+
+export interface LogSetResult {
+  isPR: boolean;
+}
+
 export interface ProgramContextValue {
   program: ProgramRecord;
   notes: Record<string, string>;
   history: Record<string, HistoryEntry[]>;
+  prs: Record<string, PersonalRecord>;
   calendar: Record<string, CalendarEntry>;
   cycle: CycleState;
   soreness: Record<string, SorenessRecord>;
@@ -81,15 +104,7 @@ export interface ProgramContextValue {
   ready: boolean;
   activeSession: ActiveSessionState | null;
   saveNote: (exerciseId: string, text: string) => Promise<void>;
-  logSet: (
-    exerciseId: string,
-    input: {
-      weightKg: number;
-      reps: number;
-      dayKey?: DayKey;
-      date?: string;
-    },
-  ) => Promise<void>;
+  logSet: (exerciseId: string, input: LogSetInput) => Promise<LogSetResult>;
   deleteSet: (exerciseId: string, setId: string) => Promise<void>;
   logRecoveryDay: (cardio?: CardioLog | null) => Promise<void>;
   revertRecoveryDay: () => Promise<void>;
@@ -115,6 +130,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
   );
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [history, setHistory] = useState<Record<string, HistoryEntry[]>>({});
+  const [prs, setPRs] = useState<Record<string, PersonalRecord>>({});
   const [calendar, setCalendar] = useState<Record<string, CalendarEntry>>({});
   const [soreness, setSoreness] = useState<Record<string, SorenessRecord>>({});
   const today = localDateKey();
@@ -162,6 +178,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
           loaded,
           loadedNotes,
           loadedHistory,
+          loadedPRs,
           storedCycle,
           storedCalendar,
           storedSoreness,
@@ -170,6 +187,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
           loadProgram(),
           loadAllNotes(),
           loadAllHistory(),
+          loadAllPRs(),
           loadCycle(),
           loadCalendar(),
           loadSoreness(),
@@ -179,6 +197,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
         setProgram(loaded);
         setNotes(loadedNotes);
         setHistory(loadedHistory);
+        setPRs(loadedPRs);
         setSoreness(storedSoreness);
         const todayKey = localDateKey();
         const order =
@@ -249,29 +268,53 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
     [persistenceOk],
   );
 
+  const persistPRForExercise = useCallback(
+    async (exerciseId: string, entries: HistoryEntry[]) => {
+      const prType = program.exercises[exerciseId]?.prType ?? "weight";
+      const warmup = warmupPrescriptionFor(program, exerciseId);
+      const nextPR = bestPRFromHistory(entries, prType, warmup);
+      if (persistenceOk !== false) {
+        try {
+          if (nextPR) await savePR(exerciseId, nextPR);
+          else await deletePR(exerciseId);
+        } catch (err) {
+          console.error("[protocol/program] PR persist failed", err);
+        }
+      }
+      setPRs((prev) => {
+        const next = { ...prev };
+        if (nextPR) next[exerciseId] = nextPR;
+        else delete next[exerciseId];
+        return next;
+      });
+    },
+    [persistenceOk, program],
+  );
+
   const logSet = useCallback(
-    async (
-      exerciseId: string,
-      input: {
-        weightKg: number;
-        reps: number;
-        dayKey?: DayKey;
-        date?: string;
-      },
-    ) => {
+    async (exerciseId: string, input: LogSetInput): Promise<LogSetResult> => {
+      const flagged = shouldFlagWarmup(
+        input,
+        program,
+        exerciseId,
+        input.dayKey,
+      );
+      const rpe = parseRpe(input.rpe);
       const set: HistorySet = {
         id: newSetId(),
         weightKg: input.weightKg,
         reps: input.reps,
         loggedAt: new Date().toISOString(),
+        ...(flagged ? { isWarmup: true } : {}),
+        ...(rpe != null ? { rpe } : {}),
       };
       const date = input.date ?? localDateKey();
-      const nextEntries = appendSet(
-        history[exerciseId] ?? [],
-        set,
-        date,
-        input.dayKey,
-      );
+      const previousEntries = history[exerciseId] ?? [];
+      const prType = program.exercises[exerciseId]?.prType ?? "weight";
+      const warmup = warmupPrescriptionFor(program, exerciseId, input.dayKey);
+      const previousBest = bestPRFromHistory(previousEntries, prType, warmup);
+      const isPR = setEstablishesPR(set, date, previousBest, prType, warmup);
+      const nextEntries = appendSet(previousEntries, set, date, input.dayKey);
       if (persistenceOk !== false) {
         try {
           await saveExerciseHistory(exerciseId, nextEntries);
@@ -281,8 +324,10 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
         }
       }
       setHistory((prev) => ({ ...prev, [exerciseId]: nextEntries }));
+      await persistPRForExercise(exerciseId, nextEntries);
+      return { isPR };
     },
-    [history, persistenceOk],
+    [history, persistPRForExercise, persistenceOk, program],
   );
 
   const deleteSet = useCallback(
@@ -302,8 +347,9 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
         else next[exerciseId] = nextEntries;
         return next;
       });
+      await persistPRForExercise(exerciseId, nextEntries);
     },
-    [history, persistenceOk],
+    [history, persistPRForExercise, persistenceOk],
   );
   const daysFor = useCallback(
     (exerciseId: string) => daysForExercise(program, exerciseId),
@@ -419,7 +465,12 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
           calendar,
           programStarted: cycle.started === true,
         },
-        { save: saveActiveSession, load: loadActiveSession },
+        {
+          save: saveActiveSession,
+          load: loadActiveSession,
+          saveSession,
+          loadSession,
+        },
       );
       setActiveSession(stored);
       return stored;
@@ -508,6 +559,10 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
           loadSession,
         },
         cycle.outOfSequenceFrom,
+        {
+          startedAt: session.startedAt,
+          finishedAt: new Date().toISOString(),
+        },
       );
       setCycle(stored.cycle);
       setCalendar(stored.calendar);
@@ -527,6 +582,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
       program,
       notes,
       history,
+      prs,
       calendar,
       cycle,
       soreness,
@@ -553,6 +609,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
       program,
       notes,
       history,
+      prs,
       calendar,
       cycle,
       soreness,

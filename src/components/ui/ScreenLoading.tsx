@@ -131,6 +131,26 @@ export function HistoryScreenSkeleton() {
   );
 }
 
+/** Progress PR Wall + volume shimmer */
+export function ProgressScreenSkeleton() {
+  return (
+    <div
+      className="flex flex-col gap-6"
+      aria-busy="true"
+      aria-label="Loading progress"
+    >
+      <PageHeader title="Progress" />
+      <Skeleton className="h-48 w-full" rounded="xl" />
+      <div className="grid grid-cols-2 gap-3">
+        <Skeleton className="h-28" rounded="xl" />
+        <Skeleton className="h-28" rounded="xl" />
+        <Skeleton className="h-28" rounded="xl" />
+        <Skeleton className="h-28" rounded="xl" />
+      </div>
+    </div>
+  );
+}
+
 /** Generic settings / list shimmer */
 export function SettingsScreenSkeleton() {
   return (

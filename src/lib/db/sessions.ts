@@ -1,5 +1,5 @@
 import { getDB, getStoreValue, setStoreValue } from "./index";
-import type { CardioLog, SessionRecord } from "./cardio";
+import { mergeSessionRecord, type CardioLog, type SessionRecord } from "./cardio";
 import type { DayKey } from "@/lib/program/types";
 
 export async function loadSession(
@@ -33,17 +33,13 @@ export async function upsertSessionCardio(
   cardio: CardioLog,
 ): Promise<SessionRecord> {
   const existing = await loadSession(date);
-  const next: SessionRecord = existing
-    ? { ...existing, cardio, durationMin: cardio.durationMin }
-    : {
-        date,
-        dayKey,
-        type: "program",
-        entries: [],
-        cardio,
-        durationMin: cardio.durationMin,
-        complete: false,
-      };
+  const next = mergeSessionRecord(existing, {
+    date,
+    dayKey,
+    cardio,
+    durationMin: cardio.durationMin,
+    complete: existing?.complete ?? false,
+  });
   await saveSession(next);
   return next;
 }

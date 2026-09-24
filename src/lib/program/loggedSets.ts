@@ -11,7 +11,7 @@ export function setScheme(sets: HistorySet[]): string {
 }
 
 export function topLoadKg(sets: HistorySet[], prType: PRType): number {
-  const weights = sets.map((s) => s.weightKg);
+  const weights = sets.filter((s) => s.isWarmup !== true).map((s) => s.weightKg);
   if (weights.length === 0) return 0;
   if (prType === "inverse-weight") return Math.min(...weights);
   return Math.max(...weights);
@@ -20,6 +20,7 @@ export function topLoadKg(sets: HistorySet[], prType: PRType): number {
 export function bestEst1RM(sets: HistorySet[]): number | null {
   let best: number | null = null;
   for (const s of sets) {
+    if (s.isWarmup === true) continue;
     const est = epley1RM(s.weightKg, s.reps);
     if (est == null) continue;
     if (best === null || est > best) best = est;

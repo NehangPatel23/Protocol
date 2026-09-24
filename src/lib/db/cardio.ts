@@ -65,9 +65,45 @@ export interface SessionRecord {
   type: "program" | "adhoc";
   entries: unknown[];
   cardio: CardioLog | null;
+  /** Cardio finisher length — not workout elapsed time. */
   durationMin?: number;
   notes?: string;
   complete: boolean;
   /** Set by `logChosenDay` — History shows the out-of-sequence banner. */
   outOfSequenceBanner?: true;
+  /** Wall-clock from Start Session. Sticky: first write wins. */
+  startedAt?: string;
+  /** Wall-clock from Finish Workout. */
+  finishedAt?: string;
+}
+
+/** Merge a sessions-store patch without dropping cardio, timestamps, or the banner. */
+export function mergeSessionRecord(
+  existing: SessionRecord | undefined,
+  patch: Partial<SessionRecord> & Pick<SessionRecord, "date" | "dayKey">,
+): SessionRecord {
+  const record: SessionRecord = {
+    date: patch.date,
+    dayKey: patch.dayKey,
+    type: patch.type ?? existing?.type ?? "program",
+    entries: patch.entries ?? existing?.entries ?? [],
+    cardio:
+      patch.cardio !== undefined ? patch.cardio : (existing?.cardio ?? null),
+    complete: patch.complete ?? existing?.complete ?? false,
+  };
+  const durationMin = patch.durationMin ?? existing?.durationMin;
+  if (typeof durationMin === "number") record.durationMin = durationMin;
+  const notes = patch.notes ?? existing?.notes;
+  if (notes != null) record.notes = notes;
+  const startedAt = existing?.startedAt ?? patch.startedAt;
+  if (startedAt) record.startedAt = startedAt;
+  const finishedAt = patch.finishedAt ?? existing?.finishedAt;
+  if (finishedAt) record.finishedAt = finishedAt;
+  if (
+    patch.outOfSequenceBanner === true ||
+    existing?.outOfSequenceBanner === true
+  ) {
+    record.outOfSequenceBanner = true;
+  }
+  return record;
 }

@@ -13,6 +13,8 @@ export interface HistorySet {
   rpe?: number;
   toFailure?: boolean;
   loggedAt: string;
+  /** Flagged warm-up — excluded from PRs and volume (Master Prompt §6.4). */
+  isWarmup?: boolean;
 }
 
 export interface HistoryEntry {
