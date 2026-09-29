@@ -231,6 +231,33 @@ describe("HistoryView session list", () => {
     );
   });
 
+  it("lifts the selected day's workout into its own section and out of the month list", () => {
+    renderMonth(mixedCalendar, { selectedDate: "2026-09-01" });
+    const section = screen.getByRole("region", { name: "Workouts for the selected day" });
+    expect(section.textContent).toMatch(/Workouts Logged For/);
+    expect(section.textContent).toContain(
+      new Date(2026, 8, 1).toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }),
+    );
+    expect(section.querySelector("[data-testid='session-row-2026-09-01']")).toBeTruthy();
+    expect(screen.getAllByTestId("session-row-2026-09-01")).toHaveLength(1);
+    const log = screen.getByRole("region", { name: "Session log" });
+    expect(log.querySelector("[data-testid='session-row-2026-09-01']")).toBeNull();
+    expect(log.querySelector("[data-testid='session-row-2026-09-03']")).toBeTruthy();
+  });
+
+  it("does not treat the month as empty when its only workout is pinned to the selected day", () => {
+    renderMonth(
+      { "2026-09-01": { status: "completed", dayKey: "push" } },
+      { selectedDate: "2026-09-01" },
+    );
+    expect(screen.getByTestId("selected-day-workouts")).toBeTruthy();
+    expect(screen.queryByText("No workouts this month")).toBeNull();
+  });
+
   it("shows a genuine empty day state for a blank cell, not a missed label", () => {
     renderMonth(mixedCalendar, { selectedDate: "2026-09-05" });
     const empty = screen.getByTestId("history-empty-day");

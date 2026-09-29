@@ -235,3 +235,14 @@ export function formatSessionDate(dateKey: string): string {
     day: "numeric",
   });
 }
+
+/** "Sunday, September 27" — the day name and calendar date, no year. */
+export function formatLoggedDay(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  if (!y || !m || !d) return dateKey;
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}

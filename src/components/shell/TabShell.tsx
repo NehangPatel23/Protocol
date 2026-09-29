@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { BottomNav, SidebarNav } from "@/components/shell/AppNav";
+import { IosInstallCard } from "@/components/shell/IosInstallCard";
 import { usePrefs } from "@/components/PrefsProvider";
 
 export function TabShell({ children }: { children: ReactNode }) {
@@ -30,6 +31,7 @@ export function TabShell({ children }: { children: ReactNode }) {
               : "mx-auto w-full max-w-3xl flex-1 px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] pt-4 md:max-w-none md:px-6 md:pb-8 md:pt-6"
           }
         >
+          {sessionMode ? null : <IosInstallCard />}
           {children}
         </main>
         {sessionMode ? null : <BottomNav />}

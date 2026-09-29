@@ -34,9 +34,10 @@ interface CalloutCardProps {
   kind: CalloutKind;
   children: ReactNode;
   id?: string;
+  title?: string;
 }
 
-export function CalloutCard({ kind, children, id }: CalloutCardProps) {
+export function CalloutCard({ kind, children, id, title }: CalloutCardProps) {
   const style = STYLES[kind];
   return (
     <section id={id} className={`rounded-xl border px-4 py-3.5 ${style.wrap}`}>
@@ -44,7 +45,7 @@ export function CalloutCard({ kind, children, id }: CalloutCardProps) {
         className={`mb-2 flex items-center gap-2 text-[13px] font-semibold ${style.title}`}
       >
         {style.icon}
-        {TITLES[kind]}
+        {title ?? TITLES[kind]}
       </h2>
       {children}
     </section>

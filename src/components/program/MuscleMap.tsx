@@ -12,10 +12,11 @@ import { MUSCLE_LABELS, type MuscleGroup } from "@/lib/program/types";
 interface MuscleMapProps {
   primary: MuscleGroup[];
   secondary?: MuscleGroup[];
-  load: string;
-  sets: string;
-  reps: string;
-  intensity: string;
+  /** Omitted for mobility — the prescription HUD is a lifting detail. */
+  load?: string;
+  sets?: string;
+  reps?: string;
+  intensity?: string;
 }
 
 export function MuscleMap({
@@ -118,6 +119,7 @@ export function MuscleMap({
         })}
       </ul>
 
+      {load != null && sets != null && reps != null && intensity != null ? (
       <dl className="pointer-events-none absolute bottom-[4.5rem] right-2 z-10 space-y-1 text-right font-mono text-[9px] tracking-wider sm:right-3">
         <div>
           <dt className="text-muted">LOAD</dt>
@@ -136,6 +138,7 @@ export function MuscleMap({
           <dd className="font-semibold text-primary">{intensity}</dd>
         </div>
       </dl>
+      ) : null}
 
       <div className="absolute bottom-3 left-3 z-10 max-w-[78%] rounded-md border border-border-subtle/80 bg-base/90 px-2.5 py-1.5 backdrop-blur-sm">
         <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted">

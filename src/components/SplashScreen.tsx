@@ -59,7 +59,7 @@ export function SplashScreen() {
       <div className="flex flex-col items-center gap-5">
         <div className="protocol-splash-glyph relative h-28 w-28 overflow-hidden rounded-[28px] shadow-[0_0_48px_rgba(20,184,166,0.22)]">
           <Image
-            src="/icons/icon-p-192.png"
+            src="/icons/icon-p-simple-192.png"
             alt=""
             width={192}
             height={192}

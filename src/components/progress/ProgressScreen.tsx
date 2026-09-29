@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Award, Flame, Play, Trophy, TrendingUp } from "lucide-react";
+import { Award, Flame, Play, Trophy } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { usePrefs } from "@/components/PrefsProvider";
 import { useProgram } from "@/components/ProgramProvider";
@@ -128,7 +128,7 @@ function VolumeSection({ rows }: { rows: MuscleVolume[] }) {
   if (rows.length === 0) {
     return (
       <EmptyState
-        icon={TrendingUp}
+        illustration="progress"
         title="No volume this week"
         description={`${EMPTY_COPY}. Secondary muscles count as half a set; warm-ups don’t count.`}
         action={<GoToSession />}
@@ -170,7 +170,7 @@ function PRWallSection({
   if (items.length === 0) {
     return (
       <EmptyState
-        icon={Trophy}
+        illustration="progress"
         title="No PRs yet"
         description={`${EMPTY_COPY}. All-time bests show up here the first time you log a working set.`}
         action={<GoToSession />}
@@ -315,7 +315,7 @@ function PeriodSection({
           Last 4 weeks vs previous 4
         </h2>
         <EmptyState
-          icon={TrendingUp}
+          illustration="progress"
           title="Not enough data yet"
           description="Comparison needs working sets in both the last 4 weeks and the 4 before that — it will not compare real weeks against empty ones."
           className="py-10"
@@ -441,7 +441,7 @@ function RpeSection({
       {series.length === 0 || !current || !canRender ? (
         <>
           <EmptyState
-            icon={TrendingUp}
+            illustration="progress"
             title="Not enough data yet"
             description="Log optional RPE (1–10) on working sets across at least two sessions for a lift. Older sets never stored RPE."
             className="py-10"
@@ -515,7 +515,7 @@ export function ProgressView({
 
       {pageEmpty ? (
         <EmptyState
-          icon={TrendingUp}
+          illustration="progress"
           title="Not enough data yet"
           description={`${EMPTY_COPY} and your PR wall, volume, and trends will show up here.`}
           action={<GoToSession />}

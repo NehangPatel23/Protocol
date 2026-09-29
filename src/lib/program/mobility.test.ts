@@ -1,6 +1,8 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { daysBetween } from "./cycle";
-import { mobilityForMuscles, recentMusclesFromHistory } from "./mobility";
+import { mobilityArt, mobilityForMuscles, recentMusclesFromHistory } from "./mobility";
 import type { MuscleGroup } from "./types";
 
 describe("mobilityForMuscles", () => {
@@ -22,6 +24,67 @@ describe("mobilityForMuscles", () => {
     expect(selected[0]).toEqual(mobilityForMuscles(["hamstrings"])[0]);
     expect(selected[1]).toEqual(mobilityForMuscles(["glutes"])[0]);
     expect(selected[2]).toEqual(mobilityForMuscles(["calves"])[0]);
+  });
+
+  it("shows the dead hang as a third form position on cat-cow, not as a tip", () => {
+    const drill = mobilityForMuscles(["back"], 1)[0]!;
+    expect(drill.extraForm?.label).toBe("Hang");
+    expect(drill.extraForm?.slot).toBe("hang");
+    expect(drill.formCaptions?.start).toMatch(/tailbone/i);
+    expect(drill.formCaptions?.finish).toMatch(/belly/i);
+    expect(drill.tips.map((tip) => tip.text).join(" ")).not.toMatch(/hang/i);
+  });
+
+  it("gives every drill anatomical form images and at least two illustrated tips", () => {
+    const muscles: MuscleGroup[] = [
+      "chest",
+      "shoulders",
+      "triceps",
+      "back",
+      "biceps",
+      "quads",
+      "hamstrings",
+      "glutes",
+      "calves",
+      "core",
+      "forearms",
+    ];
+    const publicDir = path.resolve(__dirname, "../../../public");
+    for (const muscle of muscles) {
+      const drill = mobilityForMuscles([muscle], 1)[0]!;
+      expect(drill.tips.length).toBeGreaterThanOrEqual(
+        drill.formCaptions ? 0 : drill.extraForm ? 1 : 2,
+      );
+      if (drill.formCaptions) {
+        expect(drill.formCaptions.start.length).toBeGreaterThan(0);
+        expect(drill.formCaptions.finish.length).toBeGreaterThan(0);
+      }
+      for (const tip of drill.tips) {
+        expect(tip.text.length).toBeGreaterThan(0);
+      }
+      const slots = ["start", "finish"] as const;
+      for (const slot of slots) {
+        const file = path.join(
+          publicDir,
+          mobilityArt(drill.id, slot).replace(/^\//, ""),
+        );
+        expect(existsSync(file), file).toBe(true);
+      }
+      if (drill.extraForm) {
+        const hang = path.join(
+          publicDir,
+          mobilityArt(drill.id, drill.extraForm.slot).replace(/^\//, ""),
+        );
+        expect(existsSync(hang), hang).toBe(true);
+      }
+      for (const tip of drill.tips) {
+        const file = path.join(
+          publicDir,
+          mobilityArt(drill.id, tip.image).replace(/^\//, ""),
+        );
+        expect(existsSync(file), file).toBe(true);
+      }
+    }
   });
 });
 

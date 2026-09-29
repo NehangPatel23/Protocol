@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Outfit } from "next/font/google";
 import { AlertProvider } from "@/components/alerts/AlertProvider";
 import { PrefsProvider } from "@/components/PrefsProvider";
+import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
 import { SplashScreen } from "@/components/SplashScreen";
 import "./globals.css";
 
@@ -25,6 +26,7 @@ export const metadata: Metadata = {
   },
   description: "Strength training, planned and logged with precision.",
   applicationName: "Protocol",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     title: "Protocol",
@@ -35,8 +37,8 @@ export const metadata: Metadata = {
       { url: "/favicon.ico", sizes: "any" },
       { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
       { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/icons/icon-p-simple-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-p-simple-512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
@@ -62,6 +64,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="font-sans antialiased">
+        <ServiceWorkerRegistrar />
         <PrefsProvider>
           <AlertProvider>
             <SplashScreen />

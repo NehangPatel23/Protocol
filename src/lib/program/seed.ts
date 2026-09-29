@@ -92,8 +92,8 @@ export function buildProgramFromSeed(): ProgramRecord {
         name: fin.name,
         muscles: fin.muscles,
         equipment: "bodyweight",
-        cues: [],
-        mistakes: [],
+        cues: fin.cues,
+        mistakes: fin.mistakes,
         icon: fin.icon,
         prType: fin.prType,
       };

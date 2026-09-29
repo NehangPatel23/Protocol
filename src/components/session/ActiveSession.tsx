@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { useAlerts } from "@/components/alerts/AlertProvider";
+import { CalloutCard } from "@/components/program/CalloutCard";
 import { CardioLogger } from "@/components/program/CardioLogger";
 import { SetLogger } from "@/components/program/SetLogger";
 import { RestTimer } from "@/components/session/RestTimer";
@@ -135,7 +136,7 @@ export function ActiveSession() {
     return (
       <div className="flex flex-col gap-4 px-4 pt-4">
         <EmptyState
-          icon={Check}
+          illustration="program"
           title="Nothing programmed"
           description="This day has no lifts or finisher to log."
           action={
@@ -220,6 +221,13 @@ export function ActiveSession() {
                 units,
               )}
             </p>
+            <FormTips
+              lines={
+                assignment.sessionCues && assignment.sessionCues.length > 0
+                  ? assignment.sessionCues
+                  : exercise.cues
+              }
+            />
             {assignment.warmup ? (
               <p className="text-[13px] text-muted">
                 Warm-up {assignment.warmup.sets} × {assignment.warmup.reps}
@@ -428,5 +436,20 @@ export function ActiveSession() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function FormTips({ lines }: { lines: string[] }) {
+  if (lines.length === 0) return null;
+  return (
+    <CalloutCard kind="cues" title="Form tips">
+      <ul className="flex flex-col gap-1.5">
+        {lines.map((line) => (
+          <li key={line} className="text-[15px] leading-relaxed text-primary">
+            {line}
+          </li>
+        ))}
+      </ul>
+    </CalloutCard>
   );
 }

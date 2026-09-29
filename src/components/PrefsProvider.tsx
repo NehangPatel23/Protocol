@@ -23,7 +23,7 @@ interface PrefsContextValue {
   ready: boolean;
   persistenceOk: boolean | null;
   setUnits: (units: WeightUnit) => Promise<void>;
-  updatePrefs: (patch: Partial<Prefs>) => Promise<void>;
+  updatePrefs: (patch: Partial<Prefs>) => Promise<Prefs>;
 }
 
 const PrefsContext = createContext<PrefsContextValue | null>(null);

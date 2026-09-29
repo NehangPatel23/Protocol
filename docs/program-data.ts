@@ -635,23 +635,48 @@ export const EXERCISES: Exercise[] = [
   },
 ];
 
+const AB_CURL_CUES = [
+  'Curl the ribs toward the pelvis. The low back stays down.',
+  'Exhale as you curl up. Don’t hold your breath.',
+  'Hands stay light at the temples — the abs lift you, not a pull on the neck.',
+];
+const AB_CURL_MISTAKES = [
+  'Yanking the head forward with the hands.',
+  'Sitting all the way up so the hip flexors take the rep.',
+  'Bouncing off the floor between reps.',
+];
+const LEG_RAISE_CUES = [
+  'Press the low back gently into the floor or bench and keep it there.',
+  'Lift the legs with the lower abs. Don’t swing them up.',
+  'Lower only as far as the back stays down. Stop before it arches.',
+];
+const LEG_RAISE_MISTAKES = [
+  'Letting the low back peel off the floor.',
+  'Kicking with momentum instead of a controlled lift.',
+  'Bending the knees so much that the abs stop working. A small bend is fine if the back stays down.',
+];
+
 /** Core finishers (ab curls + leg raises) logged on Pull and Upper days — see Master Prompt program summary. */
-export const CORE_FINISHERS: Pick<Exercise, 'id' | 'name' | 'day' | 'muscles' | 'sets' | 'reps' | 'weight' | 'icon' | 'prType'>[] = [
+export const CORE_FINISHERS: Pick<Exercise, 'id' | 'name' | 'day' | 'muscles' | 'sets' | 'reps' | 'weight' | 'icon' | 'prType' | 'cues' | 'mistakes'>[] = [
   {
     id: 'ab-curls-pull', name: 'Ab Curls', day: 'pull',
     muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps',
+    cues: AB_CURL_CUES, mistakes: AB_CURL_MISTAKES,
   },
   {
     id: 'leg-raises-pull', name: 'Leg Raises', day: 'pull',
     muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps',
+    cues: LEG_RAISE_CUES, mistakes: LEG_RAISE_MISTAKES,
   },
   {
     id: 'ab-curls-upper', name: 'Ab Curls', day: 'upper',
     muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps',
+    cues: AB_CURL_CUES, mistakes: AB_CURL_MISTAKES,
   },
   {
     id: 'leg-raises-upper', name: 'Leg Raises', day: 'upper',
     muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps',
+    cues: LEG_RAISE_CUES, mistakes: LEG_RAISE_MISTAKES,
   },
 ];
 

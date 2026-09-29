@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Moon, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { MUSCLE_LABELS, type DayKey, type MuscleGroup } from "@/lib/program/types";
 import { PageHeader } from "@/components/PageHeader";
 import { CardioLogger } from "@/components/program/CardioLogger";
@@ -230,14 +230,14 @@ export function ProgramWorkspace({
 
       {day === "rest" ? (
         <EmptyState
-          icon={Moon}
+          illustration="rest"
           title="Rest day"
           description="No programmed lifts. Recovery mobility suggestions live on Home."
           className="py-14"
         />
       ) : rows.length === 0 ? (
         <EmptyState
-          icon={Search}
+          illustration={query ? "search" : "program"}
           title={query ? "No matches" : "Nothing programmed"}
           description={
             query

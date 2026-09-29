@@ -23,7 +23,13 @@ export async function loadProgram(): Promise<ProgramRecord> {
   );
 
   if (exercises && assignments && cycleOrder && Object.keys(exercises).length > 0) {
-    return { exercises, assignments, cycleOrder };
+    const stored = { exercises, assignments, cycleOrder };
+    const filled = fillMissingFormTips(stored);
+    if (filled) {
+      await persistProgram(filled);
+      return filled;
+    }
+    return stored;
   }
 
   const seeded = buildProgramFromSeed();
@@ -43,6 +49,27 @@ export async function persistProgram(program: ProgramRecord): Promise<void> {
     program.assignments,
   );
   await setStoreValue("program", PROGRAM_STORE_KEYS.cycleOrder, program.cycleOrder);
+}
+
+/**
+ * Copy seed form cues onto library exercises that were stored with none.
+ * Leaves any exercise that already has cues alone, including user edits.
+ */
+export function fillMissingFormTips(program: ProgramRecord): ProgramRecord | null {
+  const seeded = buildProgramFromSeed();
+  let changed = false;
+  const exercises = { ...program.exercises };
+  for (const [id, seedEx] of Object.entries(seeded.exercises)) {
+    const current = exercises[id];
+    if (!current || current.cues.length > 0 || seedEx.cues.length === 0) continue;
+    exercises[id] = {
+      ...current,
+      cues: seedEx.cues,
+      mistakes: current.mistakes.length > 0 ? current.mistakes : seedEx.mistakes,
+    };
+    changed = true;
+  }
+  return changed ? { ...program, exercises } : null;
 }
 
 /** Restore library + assignments from seed. Does not touch notes or history. */

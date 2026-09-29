@@ -437,7 +437,7 @@ export function HomeDashboard() {
       <div className="flex flex-col gap-5">
         <PageHeader title="Home" priority />
         <EmptyState
-          icon={Play}
+          illustration="workouts"
           title="Ready when you are"
           description="Nothing is scheduled and no days are tagged missed until you begin. Start on today’s date — the cycle pointer takes it from there."
           action={
@@ -731,9 +731,12 @@ export function HomeDashboard() {
         </h2>
         {panel === "lifts" ? (
           lifts.length === 0 ? (
-            <p className="rounded-xl bg-surface px-4 py-6 text-center text-[15px] text-secondary">
-              No lifts programmed for {DAY_LABELS[todayKey]}.
-            </p>
+            <EmptyState
+              illustration="program"
+              title="No lifts programmed"
+              description={`Nothing is assigned for ${DAY_LABELS[todayKey]}.`}
+              className="py-10"
+            />
           ) : (
             <ul className="overflow-hidden rounded-xl border border-border-subtle bg-surface">
               {lifts.map(({ exercise, assignment }, i) => (

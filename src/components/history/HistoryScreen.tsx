@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Calendar, Check, ChevronLeft, ChevronRight, Leaf, Play, Trophy, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Leaf, Play, Trophy, X } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { WeekCell } from "@/components/home/WeekCell";
 import { usePrefs } from "@/components/PrefsProvider";
 import { useProgram } from "@/components/ProgramProvider";
+import { EmptyDoodle } from "@/components/ui/EmptyDoodle";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HistoryScreenSkeleton } from "@/components/ui/ScreenLoading";
 import { loadCalendar } from "@/lib/db/cycle";
@@ -29,10 +30,12 @@ import type { ProgramRecord } from "@/lib/program/types";
 import {
   addMonths,
   buildSessionList,
+  formatLoggedDay,
   formatSessionDate,
   monthGrid,
   monthTitle,
   MONTH_WEEKDAY_LABELS,
+  sessionForDate,
   sessionsInMonth,
   visibleMonthCells,
   type HistorySessionItem,
@@ -87,10 +90,13 @@ export function HistoryView({
     () => sessionsInMonth(allSessions, year, monthIndex),
     [allSessions, year, monthIndex],
   );
+  const selectedSession = sessionForDate(monthSessions, selectedDate);
+  const otherSessions = selectedSession
+    ? monthSessions.filter((item) => item.date !== selectedDate)
+    : monthSessions;
   const [expandedDates, setExpandedDates] = useState<string[]>([]);
   const selectedCal = selectedDate ? calendar[selectedDate] : undefined;
   const title = monthTitle(year, monthIndex);
-  const selectedIsSession = monthSessions.some((s) => s.date === selectedDate);
 
   useEffect(() => {
     setExpandedDates([]);
@@ -195,7 +201,19 @@ export function HistoryView({
         </p>
       </section>
 
-      {selectedDate && !selectedIsSession ? (
+      {selectedSession ? (
+        <section aria-label="Workouts for the selected day" data-testid="selected-day-workouts">
+          <h2 className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+            Workouts Logged For {formatLoggedDay(selectedSession.date)}
+          </h2>
+          <SessionCards
+            items={[selectedSession]}
+            expandedDates={expandedDates}
+            units={units}
+            onToggle={toggleExpand}
+          />
+        </section>
+      ) : selectedDate ? (
         <EmptyDayDetail
           status={selectedCal?.status}
           dayKey={selectedCal?.dayKey}
@@ -205,12 +223,12 @@ export function HistoryView({
 
       <section aria-label="Session log">
         <h2 className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
-          Sessions · {title}
+          Logged Sessions · {title}
         </h2>
 
         {monthSessions.length === 0 ? (
           <EmptyState
-            icon={Calendar}
+            illustration="workouts"
             title="No workouts this month"
             description="Blank days are just unused — not misses. Start today’s session from Home and it will show up here."
             action={
@@ -223,35 +241,54 @@ export function HistoryView({
               </Link>
             }
           />
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {monthSessions.map((item) => {
-              const expanded = expandedDates.includes(item.date);
-              return (
-                <li key={item.date}>
-                  <article
-                    className={`overflow-hidden rounded-xl border ${
-                      expanded
-                        ? "border-accent bg-surface-raised"
-                        : "border-border-subtle bg-surface"
-                    }`}
-                  >
-                    <SessionRow
-                      item={item}
-                      selected={expanded}
-                      onSelect={() => toggleExpand(item.date)}
-                    />
-                    {expanded ? (
-                      <SessionDetail item={item} units={units} />
-                    ) : null}
-                  </article>
-                </li>
-              );
-            })}
-          </ul>
+        ) : otherSessions.length === 0 ? null : (
+          <SessionCards
+            items={otherSessions}
+            expandedDates={expandedDates}
+            units={units}
+            onToggle={toggleExpand}
+          />
         )}
       </section>
     </div>
+  );
+}
+
+function SessionCards({
+  items,
+  expandedDates,
+  units,
+  onToggle,
+}: {
+  items: HistorySessionItem[];
+  expandedDates: string[];
+  units: "kg" | "lb";
+  onToggle: (date: string) => void;
+}) {
+  return (
+    <ul className="flex flex-col gap-2">
+      {items.map((item) => {
+        const expanded = expandedDates.includes(item.date);
+        return (
+          <li key={item.date}>
+            <article
+              className={`overflow-hidden rounded-xl border ${
+                expanded
+                  ? "border-accent bg-surface-raised"
+                  : "border-border-subtle bg-surface"
+              }`}
+            >
+              <SessionRow
+                item={item}
+                selected={expanded}
+                onSelect={() => onToggle(item.date)}
+              />
+              {expanded ? <SessionDetail item={item} units={units} /> : null}
+            </article>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -279,21 +316,23 @@ function EmptyDayDetail({
   }
   if (status === "rest") {
     return (
-      <p
-        className="rounded-xl border border-border-subtle bg-surface px-4 py-5 text-[15px] text-secondary"
+      <div
+        className="rounded-xl border border-border-subtle bg-surface px-4 py-5 text-center text-[15px] text-secondary"
         data-testid="history-empty-day"
       >
+        <EmptyDoodle name="rest" className="mb-3 h-28" />
         Rest day — nothing to log.
-      </p>
+      </div>
     );
   }
   return (
-    <p
-      className="rounded-xl border border-border-subtle bg-surface px-4 py-5 text-[15px] text-secondary"
+    <div
+      className="rounded-xl border border-border-subtle bg-surface px-4 py-5 text-center text-[15px] text-secondary"
       data-testid="history-empty-day"
     >
+      <EmptyDoodle name="workouts" className="mb-3 h-28" />
       Nothing logged on {formatSessionDate(date)}.
-    </p>
+    </div>
   );
 }
 
@@ -453,11 +492,17 @@ function SessionDetail({
       <SessionStats item={item} units={units} />
 
       {item.exercises.length === 0 ? (
-        <p className="px-4 py-4 text-[15px] text-secondary">
-          {recovery
-            ? "No lifts logged — this day was an active recovery swap."
-            : "No sets logged this day."}
-        </p>
+        <div className="px-4 py-4 text-center">
+          <EmptyDoodle
+            name={recovery ? "rest" : "workouts"}
+            className="mb-3 h-28"
+          />
+          <p className="text-[15px] text-secondary">
+            {recovery
+              ? "No lifts logged — this day was an active recovery swap."
+              : "No sets logged this day."}
+          </p>
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[280px] text-left font-mono text-[12px]">

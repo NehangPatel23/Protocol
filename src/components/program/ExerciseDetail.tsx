@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, Dumbbell, Trash2 } from "lucide-react";
+import { ChevronLeft, Trash2 } from "lucide-react";
 import { useAlerts } from "@/components/alerts/AlertProvider";
 import { CalloutCard } from "@/components/program/CalloutCard";
 import { ExerciseOverflowMenu } from "@/components/program/ExerciseOverflowMenu";
@@ -16,6 +16,7 @@ import { SetLogger } from "@/components/program/SetLogger";
 import { YoutubeDemo } from "@/components/program/YoutubeDemo";
 import { usePrefs } from "@/components/PrefsProvider";
 import { useProgram } from "@/components/ProgramProvider";
+import { EmptyDoodle } from "@/components/ui/EmptyDoodle";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ExerciseDetailSkeleton } from "@/components/ui/ScreenLoading";
 import { assignmentOnDay } from "@/lib/db/program";
@@ -82,7 +83,7 @@ export function ExerciseDetail({ exerciseId, dayKey }: ExerciseDetailProps) {
   if (!exercise) {
     return (
       <EmptyState
-        icon={Dumbbell}
+        illustration="search"
         title="Exercise not found"
         description="That exercise isn’t in the library — it may have been removed from your program."
         action={
@@ -418,7 +419,8 @@ export function ExerciseDetail({ exerciseId, dayKey }: ExerciseDetailProps) {
             })}
           </div>
         ) : (
-          <div className="mb-4 flex min-h-28 flex-col items-center justify-center rounded-lg bg-base px-4">
+          <div className="mb-4 flex min-h-28 flex-col items-center justify-center rounded-lg bg-base px-4 py-4">
+            <EmptyDoodle name="progress" className="mb-2 h-24" />
             <p className="text-center text-[13px] text-secondary">
               Not enough data yet — log a few more sessions
             </p>
