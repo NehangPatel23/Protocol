@@ -3,10 +3,16 @@
 /**
  * Read-only backup preview. Presentational only — never mounts the IDB-backed
  * History / Progress screen wrappers, never reads/writes IndexedDB or localStorage.
+ *
+ * Overlay layout: portaled full-screen flex column. Banner is in normal document
+ * flow (not sticky/fixed/absolute) and is the only place that applies
+ * safe-area-inset-top. The content region is the sole scroll container.
+ * Does not reuse PageHeader, HistoryScreen, ProgressScreen, or TabShell.
  */
 
 import { Check, ChevronLeft, ChevronRight, Leaf, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { WeekCell } from "@/components/home/WeekCell";
 import { SessionCards } from "@/components/history/SessionCards";
 import { BadgeSection } from "@/components/progress/BadgeSection";
@@ -85,6 +91,20 @@ export function BackupPreviewView({
     setExpandedDates([]);
   }, [initialMonth.year, initialMonth.monthIndex, backup.exportedAt]);
 
+  // Lock the page behind the overlay; restore on close/unmount.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
+
   const cells = useMemo(
     () => visibleMonthCells(monthGrid(year, monthIndex)),
     [year, monthIndex],
@@ -108,7 +128,7 @@ export function BackupPreviewView({
     );
   }
 
-  return (
+  const overlay = (
     <div
       className="fixed inset-0 z-[60] flex flex-col bg-base"
       data-testid="backup-preview"
@@ -116,27 +136,33 @@ export function BackupPreviewView({
       aria-modal="true"
       aria-labelledby="backup-preview-banner"
     >
-      <div className="sticky top-0 z-10 border-b border-warning/40 bg-warning-bg pt-[env(safe-area-inset-top)]">
-        <div className="flex items-start justify-between gap-3 px-4 py-3">
-          <p
-            id="backup-preview-banner"
-            className="text-[14px] font-semibold text-warning"
-            data-testid="backup-preview-banner"
-          >
-            Previewing a backup file. Nothing is saved.
-          </p>
-          <button
-            type="button"
-            data-testid="backup-preview-close"
-            onClick={onClose}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-3 text-[15px] font-semibold text-primary"
-          >
-            Close
-          </button>
-        </div>
+      {/* Banner: normal flow only — sole top safe-area owner inside the overlay. */}
+      <div
+        className="flex shrink-0 items-center justify-between gap-3 border-b border-warning/40 bg-warning-bg px-4 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))]"
+        data-testid="backup-preview-banner-bar"
+      >
+        <p
+          id="backup-preview-banner"
+          className="min-w-0 flex-1 text-[14px] font-semibold leading-snug text-warning"
+          data-testid="backup-preview-banner"
+        >
+          Previewing a backup file. Nothing is saved.
+        </p>
+        <button
+          type="button"
+          data-testid="backup-preview-close"
+          onClick={onClose}
+          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-3 text-[15px] font-semibold text-primary"
+        >
+          Close
+        </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+      {/* Sole scroll container — no top padding / PageHeader spacer / TabShell inset. */}
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+        data-testid="backup-preview-content"
+      >
         <div className="mx-auto flex w-full max-w-lg flex-col gap-8">
           <section aria-label="Backup calendar">
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -192,7 +218,10 @@ export function BackupPreviewView({
               ))}
             </ol>
 
-            <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+            <p
+              className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted"
+              data-testid="backup-preview-legend"
+            >
               <span className="inline-flex items-center gap-1.5">
                 <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-accent text-accent-foreground">
                   <Check className="h-3 w-3" aria-hidden />
@@ -210,6 +239,10 @@ export function BackupPreviewView({
                   <X className="h-3 w-3" aria-hidden />
                 </span>
                 Missed
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-4 w-4 rounded border-2 border-muted bg-transparent" />
+                Rest
               </span>
             </p>
           </section>
@@ -259,4 +292,8 @@ export function BackupPreviewView({
       </div>
     </div>
   );
+
+  // Portal escapes DataBackupSection's overflow-hidden so fixed inset-0 is viewport-true.
+  if (typeof document === "undefined") return null;
+  return createPortal(overlay, document.body);
 }

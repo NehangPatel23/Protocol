@@ -189,8 +189,11 @@ describe("BackupPreviewView source isolation", () => {
     const src = readFileSync(srcPath, "utf8");
     expect(src).not.toMatch(/from\s+["'][^"']*HistoryScreen["']/);
     expect(src).not.toMatch(/from\s+["'][^"']*ProgressScreen["']/);
+    expect(src).not.toMatch(/from\s+["'][^"']*PageHeader["']/);
+    expect(src).not.toMatch(/from\s+["'][^"']*TabShell["']/);
     expect(src).not.toMatch(/<\s*HistoryScreen\b/);
     expect(src).not.toMatch(/<\s*ProgressScreen\b/);
+    expect(src).not.toMatch(/<\s*PageHeader\b/);
     // Types + localDateKey helpers are ok; IDB store modules are not.
     expect(src).not.toMatch(
       /@\/lib\/db\/(index|cycle|sessions|badges|prs|program|activeSession|soreness)\b/,
@@ -241,6 +244,63 @@ describe("BackupPreviewView rendering", () => {
     expect(screen.getByTestId("backup-preview-banner").textContent).toMatch(
       /Nothing is saved/,
     );
+  });
+
+  it("places the banner before the content region with no sticky/fixed/absolute classes", () => {
+    // Documented layout check: banner must precede content in the DOM and stay
+    // in normal flow (no sticky/fixed/absolute) so it cannot float over the calendar.
+    render(
+      <BackupPreviewView
+        backup={fixtureBackup()}
+        fallbackUnits="kg"
+        onClose={() => {}}
+        today={TODAY}
+      />,
+    );
+
+    const root = screen.getByTestId("backup-preview");
+    const bannerBar = screen.getByTestId("backup-preview-banner-bar");
+    const content = screen.getByTestId("backup-preview-content");
+
+    expect(root.firstElementChild).toBe(bannerBar);
+    expect(bannerBar.nextElementSibling).toBe(content);
+    expect(bannerBar.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // Banner bar must stay in normal flow — positioning classes would float it mid-screen.
+    expect(bannerBar.className).not.toMatch(/\b(sticky|fixed|absolute)\b/);
+    expect(bannerBar.className).not.toMatch(/\btop-0\b/);
+  });
+
+  it("shows all four calendar legend statuses including Rest", () => {
+    render(
+      <BackupPreviewView
+        backup={fixtureBackup()}
+        fallbackUnits="kg"
+        onClose={() => {}}
+        today={TODAY}
+      />,
+    );
+    const legend = screen.getByTestId("backup-preview-legend");
+    expect(legend.textContent).toMatch(/Completed/);
+    expect(legend.textContent).toMatch(/Recovery/);
+    expect(legend.textContent).toMatch(/Missed/);
+    expect(legend.textContent).toMatch(/Rest/);
+  });
+
+  it("locks document scroll while open and restores it on close", () => {
+    const { unmount } = render(
+      <BackupPreviewView
+        backup={fixtureBackup()}
+        fallbackUnits="kg"
+        onClose={() => {}}
+        today={TODAY}
+      />,
+    );
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(document.documentElement.style.overflow).toBe("hidden");
+    unmount();
+    expect(document.body.style.overflow).toBe("");
+    expect(document.documentElement.style.overflow).toBe("");
   });
 
   it("shows no PR for a 0-weight set on an external lift", () => {
