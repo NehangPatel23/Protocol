@@ -851,7 +851,7 @@ export function HomeDashboard() {
           <div
             role="dialog"
             aria-labelledby="sore-title"
-            className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-5 shadow-xl"
+            className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="sore-title" className="text-[18px] font-semibold text-primary">
@@ -893,7 +893,7 @@ export function HomeDashboard() {
           <div
             role="dialog"
             aria-labelledby="undo-completion-title"
-            className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-5 shadow-xl"
+            className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h2
@@ -935,7 +935,7 @@ export function HomeDashboard() {
           <div
             role="dialog"
             aria-labelledby="cardio-title"
-            className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface p-5 shadow-xl"
+            className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="cardio-title" className="text-[18px] font-semibold text-primary">

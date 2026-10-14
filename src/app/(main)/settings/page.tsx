@@ -4,7 +4,9 @@ import { Settings } from "lucide-react";
 import { useAlerts } from "@/components/alerts/AlertProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { usePrefs } from "@/components/PrefsProvider";
+import { useProgram } from "@/components/ProgramProvider";
 import { SettingsScreenSkeleton } from "@/components/ui/ScreenLoading";
+import { localDateKey } from "@/lib/db/history";
 import type { WeightUnit } from "@/lib/db/schema";
 
 function UnitToggle({
@@ -40,6 +42,70 @@ function UnitToggle({
         );
       })}
     </div>
+  );
+}
+
+/** Read-only cycle/calendar dump for phone verification — never writes. */
+function DebugCyclePanel() {
+  const { cycle, calendar, ready } = useProgram();
+  const today = localDateKey();
+  const todayEntry = calendar[today] ?? null;
+
+  if (!ready) return null;
+
+  return (
+    <details
+      className="overflow-hidden rounded-xl border border-border-subtle bg-surface"
+      data-testid="settings-debug"
+    >
+      <summary className="cursor-pointer list-none border-b border-border-subtle px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted marker:content-none [&::-webkit-details-marker]:hidden">
+        <span className="inline-flex w-full items-center justify-between gap-2">
+          Debug
+          <span className="text-[12px] font-normal normal-case tracking-normal text-secondary">
+            read-only
+          </span>
+        </span>
+      </summary>
+      <div className="flex flex-col gap-3 px-4 py-3">
+        <p className="text-[12px] text-secondary">
+          Today ({today}). Values come from in-memory program state after boot —
+          this panel does not read or write IndexedDB.
+        </p>
+        <div>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            calendar[{today}]
+          </p>
+          <pre
+            className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-base p-3 font-mono text-[11px] leading-relaxed text-secondary"
+            data-testid="settings-debug-calendar"
+          >
+            {JSON.stringify(todayEntry, null, 2)}
+          </pre>
+        </div>
+        <div>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            cycle
+          </p>
+          <pre
+            className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-base p-3 font-mono text-[11px] leading-relaxed text-secondary"
+            data-testid="settings-debug-cycle"
+          >
+            {JSON.stringify(cycle, null, 2)}
+          </pre>
+        </div>
+        <div>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            completionRevert
+          </p>
+          <pre
+            className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-base p-3 font-mono text-[11px] leading-relaxed text-secondary"
+            data-testid="settings-debug-completion-revert"
+          >
+            {JSON.stringify(cycle.completionRevert ?? null, null, 2)}
+          </pre>
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -82,6 +148,8 @@ export default function SettingsPage() {
           <UnitToggle value={prefs.units} onChange={(u) => void changeUnits(u)} />
         </div>
       </section>
+
+      <DebugCyclePanel />
 
       <section className="flex flex-col items-center rounded-xl border border-border-subtle bg-surface px-4 py-8 text-center">
         <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-border-subtle bg-base">

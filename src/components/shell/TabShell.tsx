@@ -17,7 +17,7 @@ export function TabShell({ children }: { children: ReactNode }) {
       <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
         {persistenceOk === false ? (
           <div
-            className="border-b border-warning/30 bg-warning-bg px-4 py-2 text-center text-[13px] text-warning"
+            className="border-b border-warning/30 bg-warning-bg px-4 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] text-center text-[13px] text-warning"
             role="status"
           >
             Private browsing may limit saved data — workouts might not persist
@@ -28,7 +28,10 @@ export function TabShell({ children }: { children: ReactNode }) {
           className={
             sessionMode
               ? "min-w-0 flex-1"
-              : "mx-auto w-full max-w-3xl flex-1 px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] pt-[calc(1rem+env(safe-area-inset-top))] md:max-w-none md:px-6 md:pb-8 md:pt-[calc(1.5rem+env(safe-area-inset-top))]"
+              : persistenceOk === false
+                ? // Banner already owns safe-area-inset-top; don't double-pad.
+                  "mx-auto w-full max-w-3xl flex-1 px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] pt-4 md:max-w-none md:px-6 md:pb-8 md:pt-6"
+                : "mx-auto w-full max-w-3xl flex-1 px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] pt-[calc(1rem+env(safe-area-inset-top))] md:max-w-none md:px-6 md:pb-8 md:pt-[calc(1.5rem+env(safe-area-inset-top))]"
           }
         >
           {sessionMode ? null : <IosInstallCard />}

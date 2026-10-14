@@ -362,7 +362,7 @@ export function ProgramWorkspace({
         <div
           role="dialog"
           aria-labelledby="finisher-title"
-          className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface p-5 shadow-xl"
+          className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl border border-border-subtle bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-xl"
           onClick={(e) => e.stopPropagation()}
         >
           <h2 id="finisher-title" className="mb-4 text-[18px] font-semibold text-primary">

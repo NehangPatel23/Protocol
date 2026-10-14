@@ -51,7 +51,7 @@ export function ChooseDifferentDay({
             role="dialog"
             aria-labelledby="choose-day-title"
             data-testid="choose-different-day-dialog"
-            className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-5 shadow-xl"
+            className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             {picked == null ? (

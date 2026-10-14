@@ -214,7 +214,15 @@ describe("sessionAfterUndoCompletion", () => {
         cardio: {
           activity: "walk",
           durationMin: 20,
-          intensity: "easy",
+          distance: null,
+          distanceUnit: "mi",
+          inclinePct: null,
+          speed: null,
+          speedUnit: "mph",
+          resistanceLevel: null,
+          avgHrBpm: null,
+          notes: null,
+          loggedAt: "2026-08-24T12:00:00.000Z",
         },
         complete: true,
         startedAt: "a",
@@ -362,7 +370,19 @@ describe("persistUndoCompletion atomicity", () => {
     // Give the session substance so undo updates rather than deletes.
     persistence.sessionMem.set(logDate, {
       ...persistence.sessionMem.get(logDate)!,
-      cardio: { activity: "walk", durationMin: 10, intensity: "easy" },
+      cardio: {
+        activity: "walk",
+        durationMin: 10,
+        distance: null,
+        distanceUnit: "mi",
+        inclinePct: null,
+        speed: null,
+        speedUnit: "mph",
+        resistanceLevel: null,
+        avgHrBpm: null,
+        notes: null,
+        loggedAt: "2026-08-26T12:00:00.000Z",
+      },
       durationMin: 10,
     });
 

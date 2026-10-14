@@ -46,7 +46,7 @@ export function LongGapPrompt({
         aria-labelledby="long-gap-title"
         aria-modal="true"
         data-testid="long-gap-prompt"
-        className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-5 shadow-xl"
+        className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-xl"
       >
         <h2
           id="long-gap-title"
