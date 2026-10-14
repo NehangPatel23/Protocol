@@ -36,3 +36,8 @@ export {
   assertCycleCalendarConsistent,
   latestCompletedCalendarDate,
 } from "./consistency";
+export {
+  parseBackupForView,
+  resolvePreviewProgram,
+  resolvePreviewUnits,
+} from "./viewModel";

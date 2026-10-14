@@ -1,26 +1,37 @@
 "use client";
 
-import { Download, Upload } from "lucide-react";
+import { Download, Eye, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { useAlerts } from "@/components/alerts/AlertProvider";
+import { usePrefs } from "@/components/PrefsProvider";
+import { BackupPreviewView } from "@/components/settings/BackupPreviewView";
 import {
   BackupError,
   backupFilename,
   buildBackupFile,
-  previewRestore,
+  loadDeviceSnapshot,
+  parseBackupForView,
+  planRestore,
   restoreBackup,
   serializeBackup,
   shareOrDownloadBackup,
+  type BackupFileV1,
   type RestorePreview,
 } from "@/lib/backup";
 
 export function DataBackupSection() {
   const alerts = useAlerts();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { prefs } = usePrefs();
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+  const viewInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [pendingRaw, setPendingRaw] = useState<string | null>(null);
-  const [preview, setPreview] = useState<RestorePreview | null>(null);
+  const [pendingBackup, setPendingBackup] = useState<BackupFileV1 | null>(null);
+  const [restoreSummary, setRestoreSummary] = useState<RestorePreview | null>(
+    null,
+  );
+  const [viewerBackup, setViewerBackup] = useState<BackupFileV1 | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleExport() {
@@ -47,16 +58,39 @@ export function DataBackupSection() {
     }
   }
 
-  async function handleFilePicked(file: File | undefined) {
+  async function handleViewFile(file: File | undefined) {
     if (!file) return;
     setError(null);
-    setPreview(null);
-    setPendingRaw(null);
     try {
       const text = await file.text();
-      const nextPreview = await previewRestore(text);
+      // Validate-only — works on empty or non-empty devices; never writes.
+      const backup = parseBackupForView(text);
+      setViewerBackup(backup);
+    } catch (err) {
+      const message =
+        err instanceof BackupError
+          ? err.message
+          : "Couldn’t read that backup file.";
+      setError(message);
+      alerts.danger(message, { title: "Preview blocked" });
+    } finally {
+      if (viewInputRef.current) viewInputRef.current.value = "";
+    }
+  }
+
+  async function handleRestoreFile(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    setRestoreSummary(null);
+    setPendingRaw(null);
+    setPendingBackup(null);
+    try {
+      const text = await file.text();
+      const device = await loadDeviceSnapshot();
+      const plan = planRestore(text, device);
       setPendingRaw(text);
-      setPreview(nextPreview);
+      setPendingBackup(plan.backup);
+      setRestoreSummary(plan.preview);
     } catch (err) {
       const message =
         err instanceof BackupError
@@ -65,7 +99,7 @@ export function DataBackupSection() {
       setError(message);
       alerts.danger(message, { title: "Restore blocked" });
     } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (restoreInputRef.current) restoreInputRef.current.value = "";
     }
   }
 
@@ -74,7 +108,9 @@ export function DataBackupSection() {
     setImporting(true);
     try {
       await restoreBackup(pendingRaw);
-      alerts.success("Backup restored. Reloading…", { title: "Restore complete" });
+      alerts.success("Backup restored. Reloading…", {
+        title: "Restore complete",
+      });
       window.location.reload();
     } catch (err) {
       const message =
@@ -82,20 +118,26 @@ export function DataBackupSection() {
           ? err.message
           : "Couldn’t restore that backup.";
       setError(message);
-      alerts.danger(
-        `${message} Existing data was left untouched.`,
-        { title: "Restore failed" },
-      );
-      setPreview(null);
+      alerts.danger(`${message} Existing data was left untouched.`, {
+        title: "Restore failed",
+      });
+      setRestoreSummary(null);
       setPendingRaw(null);
+      setPendingBackup(null);
     } finally {
       setImporting(false);
     }
   }
 
-  function cancelPreview() {
-    setPreview(null);
+  function cancelRestoreDialog() {
+    setRestoreSummary(null);
     setPendingRaw(null);
+    setPendingBackup(null);
+  }
+
+  function openViewerFromRestore() {
+    if (!pendingBackup) return;
+    setViewerBackup(pendingBackup);
   }
 
   return (
@@ -114,10 +156,11 @@ export function DataBackupSection() {
         </p>
         <p className="text-[13px] text-secondary">
           Restore only works on a fresh install (no calendar days, sessions,
-          exercise history, or started cycle). Merge and replace arrive later.
+          exercise history, or started cycle). You can preview any valid backup
+          without saving it.
         </p>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
             data-testid="settings-export-backup"
@@ -130,20 +173,37 @@ export function DataBackupSection() {
           </button>
           <button
             type="button"
+            data-testid="settings-view-backup"
+            onClick={() => viewInputRef.current?.click()}
+            className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-border-subtle bg-base px-4 text-[14px] font-semibold text-primary"
+          >
+            <Eye className="h-4 w-4" aria-hidden />
+            View backup
+          </button>
+          <button
+            type="button"
             data-testid="settings-import-backup"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => restoreInputRef.current?.click()}
             className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-border-subtle bg-base px-4 text-[14px] font-semibold text-primary"
           >
             <Upload className="h-4 w-4" aria-hidden />
             Restore backup
           </button>
           <input
-            ref={fileInputRef}
+            ref={viewInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            data-testid="settings-view-file"
+            onChange={(e) => void handleViewFile(e.target.files?.[0])}
+          />
+          <input
+            ref={restoreInputRef}
             type="file"
             accept=".json,application/json"
             className="hidden"
             data-testid="settings-import-file"
-            onChange={(e) => void handleFilePicked(e.target.files?.[0])}
+            onChange={(e) => void handleRestoreFile(e.target.files?.[0])}
           />
         </div>
 
@@ -161,11 +221,11 @@ export function DataBackupSection() {
         ) : null}
       </div>
 
-      {preview ? (
+      {restoreSummary ? (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-base/70 p-4 md:items-center"
           role="presentation"
-          onClick={() => !importing && cancelPreview()}
+          onClick={() => !importing && cancelRestoreDialog()}
         >
           <div
             role="dialog"
@@ -181,56 +241,77 @@ export function DataBackupSection() {
               Restore this backup?
             </h2>
             <dl className="mt-3 space-y-2 text-[14px]">
-              <PreviewRow label="Exported" value={formatExportedAt(preview.exportedAt)} />
-              <PreviewRow label="App version" value={preview.appVersion} />
+              <PreviewRow
+                label="Exported"
+                value={formatExportedAt(restoreSummary.exportedAt)}
+              />
+              <PreviewRow label="App version" value={restoreSummary.appVersion} />
               <PreviewRow
                 label="Sessions"
-                value={String(preview.sessionCount)}
+                value={String(restoreSummary.sessionCount)}
               />
               <PreviewRow
                 label="Exercise histories"
-                value={String(preview.exerciseHistoryCount)}
+                value={String(restoreSummary.exerciseHistoryCount)}
               />
               <PreviewRow
                 label="Calendar days"
-                value={String(preview.calendarDayCount)}
+                value={String(restoreSummary.calendarDayCount)}
               />
               <PreviewRow
                 label="Date range"
-                value={formatDateRange(preview.dateRange)}
+                value={formatDateRange(restoreSummary.dateRange)}
               />
               <PreviewRow
                 label="Program"
                 value={
-                  preview.programIncluded
+                  restoreSummary.programIncluded
                     ? "Includes your edited program"
                     : "Seed program (re-seeded on restore)"
                 }
               />
               <PreviewRow
                 label="Active session"
-                value={preview.activeSession.reason}
+                value={restoreSummary.activeSession.reason}
               />
             </dl>
+            <button
+              type="button"
+              data-testid="settings-restore-open-viewer"
+              disabled={importing || !pendingBackup}
+              onClick={openViewerFromRestore}
+              className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-border-subtle bg-base text-[14px] font-semibold text-primary disabled:opacity-60"
+            >
+              <Eye className="h-4 w-4" aria-hidden />
+              Preview backup
+            </button>
             <button
               type="button"
               data-testid="settings-restore-confirm"
               disabled={importing}
               onClick={() => void confirmRestore()}
-              className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-accent text-[14px] font-bold uppercase tracking-[0.08em] text-accent-foreground disabled:opacity-60"
+              className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-accent text-[14px] font-bold uppercase tracking-[0.08em] text-accent-foreground disabled:opacity-60"
             >
               {importing ? "Restoring…" : "Restore backup"}
             </button>
             <button
               type="button"
               disabled={importing}
-              onClick={cancelPreview}
+              onClick={cancelRestoreDialog}
               className="mt-2 inline-flex min-h-11 w-full items-center justify-center text-[15px] font-medium text-secondary"
             >
               Cancel
             </button>
           </div>
         </div>
+      ) : null}
+
+      {viewerBackup ? (
+        <BackupPreviewView
+          backup={viewerBackup}
+          fallbackUnits={prefs.units}
+          onClose={() => setViewerBackup(null)}
+        />
       ) : null}
     </section>
   );

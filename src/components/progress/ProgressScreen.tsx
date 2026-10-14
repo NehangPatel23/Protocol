@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Award, Flame, Play, Trophy } from "lucide-react";
+import { Play } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { usePrefs } from "@/components/PrefsProvider";
 import { useProgram } from "@/components/ProgramProvider";
+import { BadgeSection } from "@/components/progress/BadgeSection";
+import { PRWallSection } from "@/components/progress/PRWallSection";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProgressScreenSkeleton } from "@/components/ui/ScreenLoading";
 import { RpeTrendChart } from "@/components/progress/RpeTrendChart";
@@ -15,13 +17,7 @@ import { loadAllHistory, localDateKey, type HistoryEntry } from "@/lib/db/histor
 import type { Prefs, WeightUnit } from "@/lib/db/schema";
 import type { CalendarEntry } from "@/lib/program/cycle";
 import type { ProgramRecord } from "@/lib/program/types";
-import {
-  BADGE_COPY,
-  computeBadges,
-  mergeBadges,
-  type Badge,
-  type BadgeId,
-} from "@/lib/progress/badges";
+import { computeBadges, mergeBadges } from "@/lib/progress/badges";
 import {
   compareExerciseVolume,
   compareMuscleVolume,
@@ -37,12 +33,9 @@ import {
 import {
   buildPRWall,
   formatBestSet,
-  formatPRCaption,
   formatPRDate,
-  formatPRHeadline,
   formatSetsPerWeek,
   volumeShare,
-  type PRWallItem,
 } from "@/lib/progress/view";
 import { weeklyVolumePerMuscle, type MuscleVolume } from "@/lib/progress/volume";
 
@@ -157,113 +150,6 @@ function VolumeSection({ rows }: { rows: MuscleVolume[] }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-function PRWallSection({
-  items,
-  units,
-}: {
-  items: PRWallItem[];
-  units: WeightUnit;
-}) {
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        illustration="progress"
-        title="No PRs yet"
-        description={`${EMPTY_COPY}. All-time bests show up here the first time you log a working set.`}
-        action={<GoToSession />}
-        className="py-10"
-      />
-    );
-  }
-
-  return (
-    <div>
-      {items.length === 1 ? (
-        <p
-          className="mb-3 text-[13px] text-muted"
-          data-testid="progress-pr-sparse"
-        >
-          One all-time best so far — more cards appear as you beat other lifts.
-        </p>
-      ) : null}
-      <div
-        className="grid grid-cols-2 gap-3"
-        data-testid="progress-pr-wall"
-        data-count={items.length}
-      >
-        {items.map((item) => (
-          <article
-            key={item.exerciseId}
-            data-testid={`progress-pr-card-${item.exerciseId}`}
-            className="flex flex-col rounded-xl border border-border-subtle bg-surface p-4"
-          >
-            <div className="mb-3 flex items-start justify-between gap-2">
-              <p className="min-w-0 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary">
-                {item.name}
-              </p>
-              <Trophy
-                className="h-4 w-4 shrink-0 text-warning"
-                strokeWidth={2}
-                aria-hidden
-              />
-            </div>
-            <p className="tabular text-[22px] font-bold leading-none tracking-tight text-accent">
-              {formatPRHeadline(item, units)}
-            </p>
-            <p className="mt-2 text-[13px] text-muted">
-              {formatPRCaption(item)}
-            </p>
-            <p className="sr-only">
-              Achieved {formatPRDate(item.record.date)}
-            </p>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const BADGE_ICONS: Record<BadgeId, typeof Trophy> = {
-  "first-pr": Trophy,
-  "ten-sessions": Award,
-  "four-week-streak": Flame,
-};
-
-function BadgeSection({ badges }: { badges: Badge[] }) {
-  if (badges.length === 0) return null;
-  return (
-    <section data-testid="progress-badges">
-      <h2 className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
-        Badges
-      </h2>
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {badges.map((badge) => {
-          const Icon = BADGE_ICONS[badge.id];
-          const copy = BADGE_COPY[badge.id];
-          return (
-            <li
-              key={badge.id}
-              data-testid={`progress-badge-${badge.id}`}
-              className="rounded-xl border border-border-subtle bg-surface p-4"
-            >
-              <div className="mb-2 flex items-center gap-2">
-                <Icon className="h-4 w-4 text-warning" aria-hidden />
-                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
-                  {copy.title}
-                </p>
-              </div>
-              <p className="text-[13px] text-secondary">{copy.description}</p>
-              <p className="mt-2 text-[12px] text-muted">
-                Earned {formatPRDate(badge.earnedDate)}
-              </p>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
   );
 }
 
@@ -546,7 +432,19 @@ export function ProgressView({
               <h2 className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
                 PR Wall
               </h2>
-              <PRWallSection items={wall} units={units} />
+              <PRWallSection
+                items={wall}
+                units={units}
+                emptyFallback={
+                  <EmptyState
+                    illustration="progress"
+                    title="No PRs yet"
+                    description={`${EMPTY_COPY}. All-time bests show up here the first time you log a working set.`}
+                    action={<GoToSession />}
+                    className="py-10"
+                  />
+                }
+              />
             </section>
           </div>
         </div>
