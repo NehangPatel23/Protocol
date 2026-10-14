@@ -4,6 +4,7 @@ import {
   markTrainingDayDone,
   mergeCalendarWrite,
 } from "@/lib/db/cycle";
+import type { StoreWrite } from "@/lib/db/index";
 import {
   chooseDifferentDay,
   completeTrainingDay,
@@ -34,11 +35,14 @@ const CYCLE: DayKey[] = [
   "rest",
 ];
 
-function memoryPersistence(): FinishWorkoutPersistence & {
+function memoryPersistence(options?: {
+  failAfter?: number;
+}): FinishWorkoutPersistence & {
   cycleMem: Map<string, CycleState>;
   calMem: Map<string, Record<string, CalendarEntry>>;
   sessionMem: Map<string, SessionRecord>;
-  sessionCleared: boolean;
+  activeCleared: boolean;
+  commitCount: number;
 } {
   const cycleMem = new Map<string, CycleState>();
   const calMem = new Map<string, Record<string, CalendarEntry>>();
@@ -47,22 +51,50 @@ function memoryPersistence(): FinishWorkoutPersistence & {
     cycleMem,
     calMem,
     sessionMem,
-    sessionCleared: false,
-    saveCycle: async (state: CycleState) => {
-      cycleMem.set("state", { ...state });
-    },
+    activeCleared: false,
+    commitCount: 0,
     loadCycle: async () => cycleMem.get("state"),
-    saveCalendar: async (calendar: Record<string, CalendarEntry>) => {
-      calMem.set("days", { ...calendar });
-    },
     loadCalendar: async () => calMem.get("days") ?? {},
-    clearActiveSession: async () => {
-      box.sessionCleared = true;
-    },
-    saveSession: async (record: SessionRecord) => {
-      sessionMem.set(record.date, { ...record });
-    },
     loadSession: async (date: string) => sessionMem.get(date),
+    commitWrites: async (writes: StoreWrite[]) => {
+      box.commitCount += 1;
+      if (
+        typeof options?.failAfter === "number" &&
+        box.commitCount > options.failAfter
+      ) {
+        throw new Error("simulated commit failure");
+      }
+      // Apply all-or-nothing in memory (mirrors IndexedDB tx.done).
+      const nextCycle = new Map(cycleMem);
+      const nextCal = new Map(calMem);
+      const nextSession = new Map(sessionMem);
+      let nextActiveCleared = box.activeCleared;
+      for (const write of writes) {
+        if (write.op === "put") {
+          if (write.store === "cycle") {
+            nextCycle.set(write.key, write.value as CycleState);
+          } else if (write.store === "calendar") {
+            nextCal.set(
+              write.key,
+              write.value as Record<string, CalendarEntry>,
+            );
+          } else if (write.store === "sessions") {
+            nextSession.set(write.key, write.value as SessionRecord);
+          }
+        } else if (write.store === "activeSession") {
+          nextActiveCleared = true;
+        } else if (write.store === "sessions") {
+          nextSession.delete(write.key);
+        }
+      }
+      cycleMem.clear();
+      for (const [k, v] of nextCycle) cycleMem.set(k, v);
+      calMem.clear();
+      for (const [k, v] of nextCal) calMem.set(k, v);
+      sessionMem.clear();
+      for (const [k, v] of nextSession) sessionMem.set(k, v);
+      box.activeCleared = nextActiveCleared;
+    },
   };
   return box;
 }
@@ -127,11 +159,23 @@ describe("persistFinishedWorkout", () => {
     );
 
     const direct = completeTrainingDay(started, "2026-08-24", CYCLE.length);
-    expect(stored.cycle).toEqual(direct);
+    expect(stored.cycle.pointerIndex).toBe(direct.pointerIndex);
+    expect(stored.cycle.lastCompletedDate).toBe(direct.lastCompletedDate);
+    expect(stored.cycle.pendingSince).toBe(direct.pendingSince);
+    expect(stored.cycle.lastEvaluatedDate).toBe(direct.lastEvaluatedDate);
+    expect(stored.cycle.completionRevert).toEqual({
+      date: "2026-08-24",
+      dayKey: "push",
+      pointerIndex: started.pointerIndex,
+      lastCompletedDate: started.lastCompletedDate,
+      lastEvaluatedDate: started.lastEvaluatedDate,
+      pendingSince: started.pendingSince,
+      outOfSequenceFrom: null,
+      sessionBannerState: false,
+    });
     expect(stored.calendar["2026-08-24"]?.status).toBe("completed");
     expect(stored.calendar["2026-08-24"]?.dayKey).toBe("push");
-    expect(stored.cycle.pointerIndex).toBe(direct.pointerIndex);
-    expect(persistence.sessionCleared).toBe(true);
+    expect(persistence.activeCleared).toBe(true);
     expect((await persistence.loadCycle())?.pointerIndex).toBe(1);
     expect((await persistence.loadCalendar())["2026-08-24"]?.status).toBe(
       "completed",
@@ -168,7 +212,7 @@ describe("persistFinishedWorkout", () => {
     expect(rec?.complete).toBe(true);
   });
 
-  it("does not return until the calendar re-read shows completed", async () => {
+  it("does not return until commitWrites resolves", async () => {
     const cycleMem = new Map<string, CycleState>();
     const calMem = new Map<string, Record<string, CalendarEntry>>();
     let releaseSave: () => void = () => {};
@@ -178,16 +222,22 @@ describe("persistFinishedWorkout", () => {
     let returned = false;
 
     const persistence: FinishWorkoutPersistence = {
-      saveCycle: async (state) => {
-        cycleMem.set("state", { ...state });
-      },
       loadCycle: async () => cycleMem.get("state"),
-      saveCalendar: async (calendar) => {
-        await saveGate;
-        calMem.set("days", { ...calendar });
-      },
       loadCalendar: async () => calMem.get("days") ?? {},
-      clearActiveSession: async () => {},
+      commitWrites: async (writes) => {
+        await saveGate;
+        for (const write of writes) {
+          if (write.op === "put" && write.store === "calendar") {
+            calMem.set(
+              write.key,
+              write.value as Record<string, CalendarEntry>,
+            );
+          }
+          if (write.op === "put" && write.store === "cycle") {
+            cycleMem.set(write.key, write.value as CycleState);
+          }
+        }
+      },
     };
 
     const pending = persistFinishedWorkout(
@@ -214,11 +264,8 @@ describe("persistFinishedWorkout", () => {
     expect(stored.cycle.pointerIndex).toBe(1);
   });
 
-  it("throws and does not persist the pointer if calendar save is a no-op", async () => {
-    const persistence = memoryPersistence();
-    persistence.saveCalendar = async () => {
-      /* swallow */
-    };
+  it("throws and leaves stores unchanged when commitWrites fails", async () => {
+    const persistence = memoryPersistence({ failAfter: 0 });
 
     await expect(
       persistFinishedWorkout(
@@ -229,22 +276,29 @@ describe("persistFinishedWorkout", () => {
         CYCLE.length,
         persistence,
       ),
-    ).rejects.toThrow(/calendar completed/);
-    expect(persistence.sessionCleared).toBe(false);
+    ).rejects.toThrow(/simulated commit failure/);
+    expect(persistence.activeCleared).toBe(false);
     expect(persistence.cycleMem.size).toBe(0);
-    expect((await persistence.loadCycle())?.pointerIndex).toBeUndefined();
+    expect(persistence.calMem.size).toBe(0);
+    expect(persistence.sessionMem.size).toBe(0);
   });
 
   it("refuses a recovery date before any cycle write — the real finish path, not mark-done", async () => {
     const persistence = memoryPersistence();
-    const cycle = startProgram("2026-08-24");
     const calendar = markRecoveryOnCalendar({}, "2026-08-24");
-    await persistence.saveCycle(cycle);
-    await persistence.saveCalendar(calendar);
+    await persistence.commitWrites([
+      { op: "put", store: "calendar", key: "days", value: calendar },
+      {
+        op: "put",
+        store: "cycle",
+        key: "state",
+        value: startProgram("2026-08-24"),
+      },
+    ]);
 
     await expect(
       persistFinishedWorkout(
-        cycle,
+        startProgram("2026-08-24"),
         calendar,
         "2026-08-24",
         "push",
@@ -253,12 +307,42 @@ describe("persistFinishedWorkout", () => {
       ),
     ).rejects.toThrow(/already settled/);
 
-    expect(persistence.sessionCleared).toBe(false);
+    expect(persistence.activeCleared).toBe(false);
     expect((await persistence.loadCalendar())["2026-08-24"]?.status).toBe(
       "recovery",
     );
     expect((await persistence.loadCycle())?.pointerIndex).toBe(0);
     expect((await persistence.loadCycle())?.lastCompletedDate).toBeNull();
+  });
+
+  it("replaces a prior completionRevert on the next Finish", async () => {
+    const persistence = memoryPersistence();
+    const first = await persistFinishedWorkout(
+      startProgram("2026-08-24"),
+      {},
+      "2026-08-24",
+      "push",
+      CYCLE.length,
+      persistence,
+    );
+    expect(first.cycle.completionRevert?.date).toBe("2026-08-24");
+
+    const nextDay = evaluateCycle(first.cycle, "2026-08-25", CYCLE).state;
+    expect(nextDay.completionRevert).toBeNull();
+
+    const second = await persistFinishedWorkout(
+      nextDay,
+      first.calendar,
+      "2026-08-25",
+      "pull",
+      CYCLE.length,
+      persistence,
+    );
+    expect(second.cycle.completionRevert?.date).toBe("2026-08-25");
+    expect(second.cycle.completionRevert?.dayKey).toBe("pull");
+    expect(second.cycle.completionRevert?.lastEvaluatedDate).toBe(
+      nextDay.lastEvaluatedDate,
+    );
   });
 });
 
@@ -511,24 +595,8 @@ describe("out-of-sequence finish uses logChosenDay", () => {
     expect(persistence.sessionMem.get(logDate)?.outOfSequenceBanner).toBe(
       logged.session.outOfSequenceBanner,
     );
-    expect(persistence.sessionCleared).toBe(true);
-  });
-
-  it("refuses out-of-sequence finish when saveSession is missing", async () => {
-    const persistence = memoryPersistence();
-    delete persistence.saveSession;
-
-    await expect(
-      persistFinishedWorkout(
-        startProgram("2026-08-24"),
-        {},
-        "2026-08-26",
-        "legs",
-        CYCLE.length,
-        persistence,
-        "2026-08-24",
-      ),
-    ).rejects.toThrow(/saveSession/);
+    expect(persistence.activeCleared).toBe(true);
+    expect(stored.cycle.completionRevert?.outOfSequenceFrom).toBe(pendingDate);
+    expect(stored.cycle.outOfSequenceFrom).toBeNull();
   });
 });
-

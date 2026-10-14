@@ -26,7 +26,9 @@ import {
   saveCalendar,
   saveCycle,
 } from "@/lib/db/cycle";
+import { runStoresTransaction, type StoreWrite } from "@/lib/db/index";
 import { persistFinishedWorkout } from "@/lib/session/finishWorkout";
+import { persistUndoCompletion } from "@/lib/session/undoCompletion";
 import { persistChooseDifferentDay } from "@/lib/session/chooseDay";
 import {
   persistLongGapJump,
@@ -118,6 +120,7 @@ export interface ProgramContextValue {
     patch: Partial<ActiveSessionState>,
   ) => Promise<ActiveSessionState>;
   finishWorkout: () => Promise<void>;
+  undoCompletion: () => Promise<void>;
   daysFor: (exerciseId: string) => DayKey[];
 }
 
@@ -142,6 +145,12 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
   const booted = useRef(false);
   const startSessionOnce = useRef(coalesceInflight<ActiveSessionState>());
   const finishingWorkout = useRef(false);
+  const undoingCompletion = useRef(false);
+
+  const commitStoreWrites = useCallback(async (writes: StoreWrite[]) => {
+    const stores = [...new Set(writes.map((w) => w.store))];
+    await runStoresTransaction(stores, writes);
+  }, []);
 
   useEffect(() => {
     if (!prefsReady) return;
@@ -598,13 +607,10 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
         session.dayKey,
         orderNow.length,
         {
-          saveCycle,
           loadCycle,
-          saveCalendar,
           loadCalendar,
-          clearActiveSession,
-          saveSession,
           loadSession,
+          commitWrites: commitStoreWrites,
         },
         cycle.outOfSequenceFrom,
         {
@@ -618,7 +624,30 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
     } finally {
       finishingWorkout.current = false;
     }
-  }, [activeSession, calendar, cycle, program.cycleOrder]);
+  }, [activeSession, calendar, commitStoreWrites, cycle, program.cycleOrder]);
+
+  const undoCompletion = useCallback(async () => {
+    if (undoingCompletion.current) return;
+    undoingCompletion.current = true;
+    try {
+      const todayKeyLocal = localDateKey();
+      const stored = await persistUndoCompletion(
+        cycle,
+        calendar,
+        todayKeyLocal,
+        {
+          loadCycle,
+          loadCalendar,
+          loadSession,
+          commitWrites: commitStoreWrites,
+        },
+      );
+      setCycle(stored.cycle);
+      setCalendar(stored.calendar);
+    } finally {
+      undoingCompletion.current = false;
+    }
+  }, [calendar, commitStoreWrites, cycle]);
 
   const order =
     program.cycleOrder.length >= 7 ? program.cycleOrder : CYCLE_DAYS;
@@ -651,6 +680,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
       jumpLongGap,
       patchActiveSession,
       finishWorkout,
+      undoCompletion,
       daysFor,
     }),
     [
@@ -678,6 +708,7 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
       jumpLongGap,
       patchActiveSession,
       finishWorkout,
+      undoCompletion,
       daysFor,
     ],
   );

@@ -88,6 +88,7 @@ function renderHome(overrides: Partial<ProgramContextValue> = {}) {
     jumpLongGap,
     patchActiveSession: vi.fn(),
     finishWorkout: vi.fn(),
+    undoCompletion: vi.fn().mockResolvedValue(undefined),
     daysFor: () => [],
     ...overrides,
   };
@@ -262,6 +263,109 @@ describe("HomeDashboard choose a different day", () => {
     });
     expect(screen.queryByTestId("choose-different-day")).toBeNull();
     expect(screen.queryByTestId("start-session")).toBeNull();
+  });
+
+  it("shows Undo completion only when a same-day completionRevert exists", () => {
+    renderHome({
+      todayKey: "pull",
+      todaySlot: 1,
+      cycle: startedCycle({
+        pointerIndex: 1,
+        lastCompletedDate: "2026-08-26",
+        pendingSince: "2026-08-27",
+        completionRevert: {
+          date: "2026-08-26",
+          dayKey: "push",
+          pointerIndex: 0,
+          lastCompletedDate: null,
+          lastEvaluatedDate: "2026-08-26",
+          pendingSince: "2026-08-26",
+          outOfSequenceFrom: null,
+          sessionBannerState: false,
+        },
+      }),
+      calendar: {
+        "2026-08-26": { status: "completed", dayKey: "push" },
+      },
+    });
+    expect(screen.getByTestId("undo-completion")).toBeTruthy();
+  });
+
+  it("hides Undo completion when Done for today but snapshot is missing", () => {
+    renderHome({
+      todayKey: "pull",
+      todaySlot: 1,
+      cycle: startedCycle({
+        pointerIndex: 1,
+        lastCompletedDate: "2026-08-26",
+        pendingSince: "2026-08-27",
+        completionRevert: null,
+      }),
+      calendar: {
+        "2026-08-26": { status: "completed", dayKey: "push" },
+      },
+    });
+    expect(screen.getByTestId("done-for-today")).toBeTruthy();
+    expect(screen.queryByTestId("undo-completion")).toBeNull();
+  });
+
+  it("never shows Undo completion on a recovery day", () => {
+    renderHome({
+      todayKey: "push",
+      cycle: startedCycle({
+        lastCompletedDate: "2026-08-26",
+        completionRevert: {
+          date: "2026-08-26",
+          dayKey: "push",
+          pointerIndex: 0,
+          lastCompletedDate: null,
+          lastEvaluatedDate: "2026-08-26",
+          pendingSince: "2026-08-26",
+          outOfSequenceFrom: null,
+          sessionBannerState: false,
+        },
+      }),
+      calendar: {
+        "2026-08-26": { status: "recovery", dayKey: "rest" },
+      },
+    });
+    expect(screen.queryByTestId("undo-completion")).toBeNull();
+    expect(screen.queryByTestId("done-for-today")).toBeNull();
+  });
+
+  it("confirm dialog explains sets stay and calls undoCompletion", () => {
+    const undoCompletion = vi.fn().mockResolvedValue(undefined);
+    renderHome({
+      todayKey: "pull",
+      todaySlot: 1,
+      undoCompletion,
+      cycle: startedCycle({
+        pointerIndex: 1,
+        lastCompletedDate: "2026-08-26",
+        pendingSince: "2026-08-27",
+        completionRevert: {
+          date: "2026-08-26",
+          dayKey: "push",
+          pointerIndex: 0,
+          lastCompletedDate: null,
+          lastEvaluatedDate: "2026-08-26",
+          pendingSince: "2026-08-26",
+          outOfSequenceFrom: null,
+          sessionBannerState: false,
+        },
+      }),
+      calendar: {
+        "2026-08-26": { status: "completed", dayKey: "push" },
+      },
+    });
+    fireEvent.click(screen.getByTestId("undo-completion"));
+    expect(
+      screen.getByText(
+        "Your logged sets stay; only the day completion is undone.",
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByTestId("undo-completion-confirm"));
+    expect(undoCompletion).toHaveBeenCalledTimes(1);
   });
 });
 

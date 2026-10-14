@@ -5,9 +5,12 @@
 
 import { mergeSessionRecord, type SessionRecord } from "@/lib/db/cardio";
 import { markTrainingDayDone } from "@/lib/db/cycle";
+import type { StoreWrite } from "@/lib/db/index";
 import {
+  buildCompletionRevert,
   completeTrainingDay,
   logChosenDay,
+  withCompletionRevert,
   type CalendarEntry,
   type CycleState,
 } from "@/lib/program/cycle";
@@ -18,6 +21,10 @@ export interface SessionClock {
   startedAt: string;
   finishedAt: string;
 }
+
+const CYCLE_KEY = "state";
+const CALENDAR_KEY = "days";
+const ACTIVE_SESSION_KEY = "current";
 
 function isSettled(
   calendar: Record<string, CalendarEntry>,
@@ -46,15 +53,14 @@ export function applyFinishWorkout(
 }
 
 export interface FinishWorkoutPersistence {
-  saveCycle: (state: CycleState) => Promise<void>;
   loadCycle: () => Promise<CycleState | undefined>;
-  saveCalendar: (
-    calendar: Record<string, CalendarEntry>,
-  ) => Promise<void>;
   loadCalendar: () => Promise<Record<string, CalendarEntry>>;
-  clearActiveSession: () => Promise<void>;
-  saveSession?: (record: SessionRecord) => Promise<void>;
   loadSession?: (date: string) => Promise<SessionRecord | undefined>;
+  /**
+   * Single IndexedDB (or test) transaction across calendar, cycle, sessions,
+   * and activeSession. All writes commit together or none do.
+   */
+  commitWrites: (writes: StoreWrite[]) => Promise<void>;
 }
 
 /**
@@ -94,12 +100,9 @@ export function applyOutOfSequenceFinish(
 }
 
 /**
- * Persist the `completeTrainingDay` result, re-read it, then drop the
- * in-progress session record. Throws if the store does not show completed.
- *
- * Calendar is written and confirmed before the cycle pointer is saved, so a
- * refused calendar write (e.g. recovery already on that date) cannot leave an
- * advanced pointer in IndexedDB. Callers must not paint until this resolves.
+ * Persist Finish in one multi-store transaction: calendar completed, cycle
+ * advanced with `completionRevert` snapshot, sessions timestamps, clear
+ * activeSession. Re-reads after commit to confirm. Throws if verification fails.
  */
 export async function persistFinishedWorkout(
   cycle: CycleState,
@@ -121,11 +124,19 @@ export async function persistFinishedWorkout(
     originalPendingDate != null && originalPendingDate !== ""
       ? originalPendingDate
       : null;
-  if (pendingFrom && !persistence.saveSession) {
-    throw new Error(
-      "[protocol/session] out-of-sequence finish needs saveSession",
-    );
-  }
+
+  const existing = persistence.loadSession
+    ? await persistence.loadSession(date)
+    : undefined;
+  const sessionBannerState = existing?.outOfSequenceBanner === true;
+  // Snapshot pre-Finish cycle — includes lastEvaluatedDate. Replaces any
+  // prior completionRevert so a stale snapshot cannot fire after a new Finish.
+  const revert = buildCompletionRevert(
+    cycle,
+    date,
+    dayKey,
+    sessionBannerState,
+  );
 
   const applied = pendingFrom
     ? applyOutOfSequenceFinish(
@@ -136,7 +147,14 @@ export async function persistFinishedWorkout(
         cycleLength,
         pendingFrom,
       )
-    : { ...applyFinishWorkout(cycle, calendar, date, dayKey, cycleLength), session: null };
+    : {
+        ...applyFinishWorkout(cycle, calendar, date, dayKey, cycleLength),
+        session: null as null | {
+          date: string;
+          dayKey: DayKey;
+          outOfSequenceBanner: true;
+        },
+      };
 
   if (applied.calendar[date]?.status !== "completed") {
     throw new Error(
@@ -144,7 +162,33 @@ export async function persistFinishedWorkout(
     );
   }
 
-  await persistence.saveCalendar(applied.calendar);
+  const cycleToSave = withCompletionRevert(applied.cycle, revert);
+
+  const withBanner = applied.session
+    ? sessionFromLogChosenDay(existing, applied.session)
+    : existing;
+  const sessionToSave = mergeSessionRecord(withBanner, {
+    date,
+    dayKey,
+    complete: true,
+    startedAt: clock?.startedAt,
+    finishedAt: clock?.finishedAt,
+  });
+
+  const writes: StoreWrite[] = [
+    {
+      op: "put",
+      store: "calendar",
+      key: CALENDAR_KEY,
+      value: applied.calendar,
+    },
+    { op: "put", store: "cycle", key: CYCLE_KEY, value: cycleToSave },
+    { op: "put", store: "sessions", key: date, value: sessionToSave },
+    { op: "delete", store: "activeSession", key: ACTIVE_SESSION_KEY },
+  ];
+
+  await persistence.commitWrites(writes);
+
   const storedCal = await persistence.loadCalendar();
   if (storedCal[date]?.status !== "completed") {
     throw new Error(
@@ -152,12 +196,11 @@ export async function persistFinishedWorkout(
     );
   }
 
-  await persistence.saveCycle(applied.cycle);
   const storedCycle = await persistence.loadCycle();
   if (!storedCycle) {
     throw new Error("[protocol/session] finish did not persist cycle");
   }
-  if (storedCycle.pointerIndex !== applied.cycle.pointerIndex) {
+  if (storedCycle.pointerIndex !== cycleToSave.pointerIndex) {
     throw new Error(
       "[protocol/session] finish did not persist pointer advance",
     );
@@ -167,23 +210,15 @@ export async function persistFinishedWorkout(
       "[protocol/session] finish did not persist lastCompletedDate",
     );
   }
-  if (persistence.saveSession) {
-    const existing = persistence.loadSession
-      ? await persistence.loadSession(date)
-      : undefined;
-    const withBanner = applied.session
-      ? sessionFromLogChosenDay(existing, applied.session)
-      : existing;
-    await persistence.saveSession(
-      mergeSessionRecord(withBanner, {
-        date,
-        dayKey,
-        complete: true,
-        startedAt: clock?.startedAt,
-        finishedAt: clock?.finishedAt,
-      }),
+  if (
+    !storedCycle.completionRevert ||
+    storedCycle.completionRevert.date !== date ||
+    storedCycle.completionRevert.lastEvaluatedDate !== revert.lastEvaluatedDate
+  ) {
+    throw new Error(
+      "[protocol/session] finish did not persist completionRevert",
     );
   }
-  await persistence.clearActiveSession();
+
   return { cycle: storedCycle, calendar: storedCal };
 }

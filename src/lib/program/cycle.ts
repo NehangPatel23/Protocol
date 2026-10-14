@@ -18,6 +18,19 @@ export interface CalendarEntry {
   dayKey?: DayKey;
 }
 
+/** Same-day undo snapshot written on Finish — cleared next day or next completion. */
+export interface CompletionRevert {
+  date: string;
+  dayKey: DayKey;
+  pointerIndex: number;
+  lastCompletedDate: string | null;
+  lastEvaluatedDate: string;
+  pendingSince: string;
+  outOfSequenceFrom: string | null;
+  /** Whether `sessions[date].outOfSequenceBanner` was set before Finish. */
+  sessionBannerState: boolean;
+}
+
 export interface CycleState {
   pointerIndex: number;
   lastCompletedDate: string | null;
@@ -38,6 +51,8 @@ export interface CycleState {
    * Finish uses this so `logChosenDay` runs on the real path, then clears it.
    */
   outOfSequenceFrom?: string | null;
+  /** Same-day undo of Finish. Null when not undoable. */
+  completionRevert?: CompletionRevert | null;
 }
 
 /** Spec §2.7: prompt after *more than* ~5 unexplained days (fires at 6). */
@@ -69,6 +84,7 @@ export function initialCycleState(today: string): CycleState {
     recoveryRevert: null,
     dayOverride: null,
     longGapDismissedFor: null,
+    completionRevert: null,
   };
 }
 
@@ -82,6 +98,7 @@ export function startProgram(today: string): CycleState {
     recoveryRevert: null,
     dayOverride: null,
     longGapDismissedFor: null,
+    completionRevert: null,
   };
 }
 
@@ -164,6 +181,11 @@ export function evaluateCycle(
     d = addLocalDays(d, 1);
   }
 
+  const staleRevert =
+    state.completionRevert != null && state.completionRevert.date !== today
+      ? null
+      : (state.completionRevert ?? null);
+
   return {
     state: {
       ...state,
@@ -171,6 +193,7 @@ export function evaluateCycle(
       lastCompletedDate: lastCompleted,
       pendingSince,
       lastEvaluatedDate: today,
+      completionRevert: staleRevert,
     },
     writes,
   };
@@ -193,6 +216,77 @@ export function completeTrainingDay(
     lastCompletedDate: today,
     pendingSince: addLocalDays(today, 1),
     lastEvaluatedDate: today,
+  };
+}
+
+export function buildCompletionRevert(
+  state: CycleState,
+  date: string,
+  dayKey: DayKey,
+  sessionBannerState: boolean,
+): CompletionRevert {
+  return {
+    date,
+    dayKey,
+    pointerIndex: state.pointerIndex,
+    lastCompletedDate: state.lastCompletedDate,
+    lastEvaluatedDate: state.lastEvaluatedDate,
+    pendingSince: state.pendingSince,
+    outOfSequenceFrom: state.outOfSequenceFrom ?? null,
+    sessionBannerState,
+  };
+}
+
+/** Attach a same-day undo snapshot (replaces any prior snapshot). */
+export function withCompletionRevert(
+  state: CycleState,
+  revert: CompletionRevert,
+): CycleState {
+  return { ...state, completionRevert: revert };
+}
+
+export function canUndoCompletion(
+  state: CycleState,
+  calendar: Record<string, CalendarEntry>,
+  today: string,
+): boolean {
+  if (calendar[today]?.status !== "completed") return false;
+  if (state.lastCompletedDate !== today) return false;
+  const snap = state.completionRevert;
+  return snap != null && snap.date === today;
+}
+
+/**
+ * Pure undo of today's Finish. Restores cycle fields from `completionRevert`,
+ * removes `calendar[today]`, clears the snapshot. Caller persists atomically.
+ */
+export function applyUndoCompletion(
+  state: CycleState,
+  calendar: Record<string, CalendarEntry>,
+  today: string,
+): {
+  cycle: CycleState;
+  calendar: Record<string, CalendarEntry>;
+  revert: CompletionRevert;
+} {
+  if (!canUndoCompletion(state, calendar, today)) {
+    throw new Error("[protocol/cycle] undo completion refused");
+  }
+  const revert = state.completionRevert!;
+  const nextCalendar = { ...calendar };
+  delete nextCalendar[today];
+  return {
+    revert,
+    calendar: nextCalendar,
+    cycle: {
+      ...state,
+      pointerIndex: revert.pointerIndex,
+      lastCompletedDate: revert.lastCompletedDate,
+      lastEvaluatedDate: revert.lastEvaluatedDate,
+      pendingSince: revert.pendingSince,
+      outOfSequenceFrom: revert.outOfSequenceFrom,
+      completionRevert: null,
+    },
   };
 }
 

@@ -20,6 +20,7 @@ import { assignedExercisesForDay } from "@/lib/db/program";
 import { localDateKey, type HistoryEntry } from "@/lib/db/history";
 import {
   canRevertRecovery,
+  canUndoCompletion,
   isMissedPickup,
   mondayOfWeek,
 } from "@/lib/program/cycle";
@@ -245,13 +246,16 @@ export function HomeDashboard() {
     chooseDifferentDay,
     pickupLongGap,
     jumpLongGap,
+    undoCompletion,
   } = useProgram();
   const { prefs } = usePrefs();
   const alerts = useAlerts();
   const router = useRouter();
   const [soreOpen, setSoreOpen] = useState(false);
   const [cardioOpen, setCardioOpen] = useState(false);
+  const [undoOpen, setUndoOpen] = useState(false);
   const [savingSore, setSavingSore] = useState(false);
+  const [undoing, setUndoing] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startingSession, setStartingSession] = useState(false);
   const [choosingDay, setChoosingDay] = useState(false);
@@ -269,6 +273,7 @@ export function HomeDashboard() {
     todayCompleted &&
     cycle.lastCompletedDate === today &&
     !todayRecovery;
+  const showUndoCompletion = canUndoCompletion(cycle, calendar, today);
   const completedDayKey: DayKey | undefined = calendar[today]?.dayKey;
   const displayDayKey: DayKey =
     doneForToday && completedDayKey ? completedDayKey : todayKey;
@@ -413,6 +418,19 @@ export function HomeDashboard() {
       throw new Error("[protocol] chooseDifferentDay failed");
     } finally {
       setChoosingDay(false);
+    }
+  }
+
+  async function confirmUndoCompletion() {
+    setUndoing(true);
+    try {
+      await undoCompletion();
+      setUndoOpen(false);
+      alerts.success("Day completion undone — start again when ready.");
+    } catch {
+      alerts.danger("Couldn’t undo completion.", { title: "Save failed" });
+    } finally {
+      setUndoing(false);
     }
   }
 
@@ -601,6 +619,16 @@ export function HomeDashboard() {
               >
                 Next up: {DAY_LABELS[nextUpKey]}
               </p>
+            ) : null}
+            {showUndoCompletion ? (
+              <button
+                type="button"
+                data-testid="undo-completion"
+                onClick={() => setUndoOpen(true)}
+                className="inline-flex min-h-11 w-full items-center justify-center text-[14px] font-semibold text-secondary hover:text-primary"
+              >
+                Undo completion
+              </button>
             ) : null}
             <button
               type="button"
@@ -851,6 +879,48 @@ export function HomeDashboard() {
               className="mt-2 inline-flex min-h-11 w-full items-center justify-center text-[15px] font-medium text-secondary"
             >
               Never mind, I’ll lift
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {undoOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-base/70 p-4 md:items-center"
+          role="presentation"
+          onClick={() => !undoing && setUndoOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-labelledby="undo-completion-title"
+            className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="undo-completion-title"
+              className="text-[18px] font-semibold text-primary"
+            >
+              Undo completion?
+            </h2>
+            <p className="mt-2 text-[15px] text-secondary">
+              Your logged sets stay; only the day completion is undone.
+            </p>
+            <button
+              type="button"
+              data-testid="undo-completion-confirm"
+              disabled={undoing}
+              onClick={() => void confirmUndoCompletion()}
+              className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-accent text-[14px] font-bold uppercase tracking-[0.08em] text-accent-foreground disabled:opacity-60"
+            >
+              Undo completion
+            </button>
+            <button
+              type="button"
+              disabled={undoing}
+              onClick={() => setUndoOpen(false)}
+              className="mt-2 inline-flex min-h-11 w-full items-center justify-center text-[15px] font-medium text-secondary"
+            >
+              Keep it done
             </button>
           </div>
         </div>

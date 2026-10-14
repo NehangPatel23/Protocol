@@ -245,3 +245,35 @@ export async function deleteStoreValue(
   const db = await getDB();
   await withTimeout(db.delete(store, key), IDB_TIMEOUT_MS, `del:${store}`);
 }
+
+export type StoreWrite =
+  | { op: "put"; store: StoreName; key: string; value: unknown }
+  | { op: "delete"; store: StoreName; key: string };
+
+/**
+ * Single IndexedDB transaction across one or more stores. All puts/deletes
+ * commit together or none do — used by undo-completion (and finish when wired).
+ */
+export async function runStoresTransaction(
+  stores: StoreName[],
+  writes: StoreWrite[],
+): Promise<void> {
+  if (stores.length === 0) return;
+  const db = await getDB();
+  const unique = [...new Set(stores)];
+  await withTimeout(
+    (async () => {
+      const tx = db.transaction(unique, "readwrite");
+      for (const write of writes) {
+        if (write.op === "put") {
+          await tx.objectStore(write.store).put(write.value, write.key);
+        } else {
+          await tx.objectStore(write.store).delete(write.key);
+        }
+      }
+      await tx.done;
+    })(),
+    IDB_TIMEOUT_MS,
+    `tx:${unique.join("+")}`,
+  );
+}
