@@ -363,4 +363,44 @@ describe("loadType external guard", () => {
       ),
     ).toBe(true);
   });
+
+  it("applies no guard when loadType is missing (unknown exercise id)", () => {
+    const zero = set({ weightKg: 0, reps: 10 });
+    expect(isInvalidExternalLoad(zero, undefined)).toBe(false);
+    expect(isExcludedFromPR(zero, null, undefined)).toBe(false);
+    expect(
+      setEstablishesPR(zero, "2026-09-01", null, "weight", null, undefined),
+    ).toBe(true);
+    expect(
+      bestPRFromHistory(
+        [entry("2026-09-01", [zero])],
+        "weight",
+        null,
+        undefined,
+      )?.weightKg,
+    ).toBe(0);
+  });
+
+  it("inverse-weight still ranks less assistance higher with the assisted guard", () => {
+    const history = [
+      entry("2026-09-01", [set({ weightKg: 31.25, reps: 12 })]),
+      entry("2026-09-06", [set({ weightKg: 0, reps: 12 })]),
+    ];
+    const pr = bestPRFromHistory(history, "inverse-weight", null, "assisted");
+    expect(pr?.weightKg).toBe(0);
+    expect(pr?.date).toBe("2026-09-06");
+    expect(
+      setEstablishesPR(
+        set({ weightKg: 0, reps: 12 }),
+        "2026-09-06",
+        toPersonalRecord(
+          { weightKg: 31.25, reps: 12, date: "2026-09-01" },
+          "inverse-weight",
+        ),
+        "inverse-weight",
+        null,
+        "assisted",
+      ),
+    ).toBe(true);
+  });
 });

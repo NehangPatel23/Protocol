@@ -135,4 +135,30 @@ describe("weeklyVolumePerMuscle", () => {
   it("returns an empty list when nothing was logged — not a fake zero-filled chart", () => {
     expect(weeklyVolumePerMuscle({}, program, today)).toEqual([]);
   });
+
+  it("ignores external 0 kg sets but still credits real loads", () => {
+    const history = historyFor("chest-press-machine", today, [
+      { weightKg: 0, reps: 12 },
+      { weightKg: 20, reps: 12 },
+    ]);
+    const rows = weeklyVolumePerMuscle(history, program, today);
+    expect(rows.find((r) => r.muscle === "chest")?.sets).toBe(1);
+  });
+
+  it("does not drop 0 kg sets when loadType is missing on the library entry", () => {
+    const lib = program.exercises["chest-press-machine"]!;
+    const { loadType: _drop, ...withoutLoad } = lib;
+    const untyped = {
+      ...program,
+      exercises: {
+        ...program.exercises,
+        "chest-press-machine": withoutLoad,
+      },
+    };
+    const history = historyFor("chest-press-machine", today, [
+      { weightKg: 0, reps: 12 },
+    ]);
+    const rows = weeklyVolumePerMuscle(history, untyped, today);
+    expect(rows.find((r) => r.muscle === "chest")?.sets).toBe(1);
+  });
 });

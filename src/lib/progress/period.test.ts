@@ -70,6 +70,55 @@ describe("hasEnoughPeriodHistory", () => {
     };
     expect(hasEnoughPeriodHistory(history, program, today)).toBe(true);
   });
+
+  it("ignores external 0 kg sets when deciding whether a window has work", () => {
+    const history = {
+      "chest-press-machine": [
+        set("2026-07-20", { weightKg: 0, reps: 12 }),
+        set("2026-09-01", { weightKg: 25, reps: 12 }),
+      ],
+    };
+    expect(hasEnoughPeriodHistory(history, program, today)).toBe(false);
+  });
+
+  it("counts 0 kg sets when loadType is missing", () => {
+    const lib = program.exercises["chest-press-machine"]!;
+    const { loadType: _drop, ...withoutLoad } = lib;
+    const untyped = {
+      ...program,
+      exercises: {
+        ...program.exercises,
+        "chest-press-machine": withoutLoad,
+      },
+    };
+    const history = {
+      "chest-press-machine": [
+        set("2026-07-20", { weightKg: 0, reps: 12 }),
+        set("2026-09-01", { weightKg: 0, reps: 12 }),
+      ],
+    };
+    expect(hasEnoughPeriodHistory(history, untyped, today)).toBe(true);
+  });
+});
+
+describe("compareExerciseVolume loadType guard", () => {
+  it("does not count external 0 kg sets toward period set totals", () => {
+    const history = {
+      "chest-press-machine": [
+        set("2026-07-20", { weightKg: 0, reps: 12 }),
+        set("2026-07-21", { weightKg: 25, reps: 12 }),
+        set("2026-09-01", { weightKg: 0, reps: 12 }),
+        set("2026-09-02", { weightKg: 30, reps: 12 }),
+      ],
+    };
+    const row = compareExerciseVolume(history, program, today).find(
+      (r) => r.exerciseId === "chest-press-machine",
+    );
+    expect(row?.previousSets).toBe(1);
+    expect(row?.recentSets).toBe(1);
+    expect(row?.previousBest?.weightKg).toBe(25);
+    expect(row?.recentBest?.weightKg).toBe(30);
+  });
 });
 
 describe("compareMuscleVolume", () => {

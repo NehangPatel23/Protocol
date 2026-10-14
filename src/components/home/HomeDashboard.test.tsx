@@ -172,14 +172,85 @@ describe("HomeDashboard choose a different day", () => {
 
   it("does not render when calendar[today] is already completed", () => {
     renderHome({
-      todayKey: "push",
+      // Pointer already advanced to Pull after finishing Push.
+      todayKey: "pull",
+      todaySlot: 1,
+      cycle: startedCycle({
+        pointerIndex: 1,
+        lastCompletedDate: "2026-08-26",
+        pendingSince: "2026-08-27",
+      }),
       calendar: {
         "2026-08-26": { status: "completed", dayKey: "push" },
       },
     });
-    expect(screen.getByTestId("workout-complete")).toBeTruthy();
+    expect(screen.getByTestId("done-for-today")).toBeTruthy();
+    expect(screen.queryByTestId("workout-complete")).toBeNull();
     expect(screen.queryByTestId("choose-different-day")).toBeNull();
     expect(screen.queryByTestId("start-session")).toBeNull();
+  });
+
+  it("shows the completed day (not the next pointer day) with Next up", () => {
+    const pushLiftCount = program.assignments.push.length;
+    renderHome({
+      todayKey: "pull",
+      todaySlot: 1,
+      cycle: startedCycle({
+        pointerIndex: 1,
+        lastCompletedDate: "2026-08-26",
+        pendingSince: "2026-08-27",
+      }),
+      calendar: {
+        "2026-08-26": { status: "completed", dayKey: "push" },
+      },
+    });
+    expect(screen.getByText("Push Day")).toBeTruthy();
+    expect(screen.queryByText("Pull Day")).toBeNull();
+    expect(screen.getByTestId("next-up").textContent).toBe("Next up: Pull");
+    expect(
+      screen.getByText(
+        new RegExp(`^${pushLiftCount} lifts?$`),
+      ),
+    ).toBeTruthy();
+  });
+
+  it("out-of-sequence: card uses calendar dayKey, Next up is the advanced pointer", () => {
+    // Chose Legs while pending Push; after finish pointer is past Legs → Upper.
+    renderHome({
+      todayKey: "upper",
+      todaySlot: 4,
+      cycle: startedCycle({
+        pointerIndex: 4,
+        lastCompletedDate: "2026-08-26",
+        pendingSince: "2026-08-27",
+      }),
+      calendar: {
+        "2026-08-26": { status: "completed", dayKey: "legs" },
+      },
+    });
+    expect(screen.getByText("Legs Day")).toBeTruthy();
+    expect(screen.getByTestId("next-up").textContent).toBe("Next up: Upper");
+    expect(screen.getByTestId("done-for-today")).toBeTruthy();
+  });
+
+  it("when the pointer lands on Rest, Next up says Rest and Rest mobility stays off the card", () => {
+    // CYCLE_DAYS: push, pull, legs, rest, upper, lower, rest — finish Legs → Rest.
+    renderHome({
+      todayKey: "rest",
+      todaySlot: 3,
+      cycle: startedCycle({
+        pointerIndex: 3,
+        lastCompletedDate: "2026-08-26",
+        pendingSince: "2026-08-27",
+      }),
+      calendar: {
+        "2026-08-26": { status: "completed", dayKey: "legs" },
+      },
+    });
+    expect(screen.getByText("Legs Day")).toBeTruthy();
+    expect(screen.queryByText("Rest Day")).toBeNull();
+    expect(screen.getByTestId("next-up").textContent).toBe("Next up: Rest");
+    expect(screen.queryByTestId("rest-day-mobility")).toBeNull();
   });
 
   it("does not render during an active-recovery day", () => {

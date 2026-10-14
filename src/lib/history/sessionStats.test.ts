@@ -60,6 +60,21 @@ describe("formatWorkoutDuration", () => {
     ).toBe("45m");
   });
 
+  it("shows <1m when both timestamps exist but elapsed rounds under one minute", () => {
+    expect(
+      formatWorkoutDuration(
+        "2026-09-01T18:00:00.000Z",
+        "2026-09-01T18:00:20.000Z",
+      ),
+    ).toBe("<1m");
+    expect(
+      formatWorkoutDuration(
+        "2026-09-01T18:00:00.000Z",
+        "2026-09-01T18:00:00.000Z",
+      ),
+    ).toBe("<1m");
+  });
+
   it("returns undefined when a timestamp is missing or inverted", () => {
     expect(formatWorkoutDuration("nope", "2026-09-01T19:00:00.000Z")).toBeUndefined();
     expect(

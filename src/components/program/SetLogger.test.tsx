@@ -19,12 +19,87 @@ afterEach(() => {
   cleanup();
 });
 
+describe("SetLogger external load lock", () => {
+  it("does not write when weight is blank on an external lift", async () => {
+    const onLog = vi.fn().mockResolvedValue({});
+    render(
+      <SetLogger
+        prType="weight"
+        loadType="external"
+        lastWeightKg={20}
+        lastReps={10}
+        onLog={onLog}
+      />,
+    );
+    const inputs = screen.getAllByRole("textbox");
+    fireEvent.change(inputs[0]!, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Log set" }));
+    await vi.waitFor(() => {
+      expect(
+        screen.getByText("Enter a weight greater than 0 for this lift."),
+      ).toBeTruthy();
+    });
+    expect(onLog).not.toHaveBeenCalled();
+  });
+
+  it("does not write when weight is 0 on an external lift", async () => {
+    const onLog = vi.fn().mockResolvedValue({});
+    render(
+      <SetLogger
+        prType="weight"
+        loadType="external"
+        lastWeightKg={20}
+        lastReps={10}
+        onLog={onLog}
+      />,
+    );
+    const inputs = screen.getAllByRole("textbox");
+    fireEvent.change(inputs[0]!, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Log set" }));
+    await vi.waitFor(() => {
+      expect(
+        screen.getByText("Enter a weight greater than 0 for this lift."),
+      ).toBeTruthy();
+    });
+    expect(onLog).not.toHaveBeenCalled();
+  });
+
+  it("accepts 0 on an assisted lift", async () => {
+    const onLog = vi.fn().mockResolvedValue({});
+    render(
+      <SetLogger
+        prType="inverse-weight"
+        loadType="assisted"
+        lastWeightKg={26}
+        lastReps={12}
+        onLog={onLog}
+      />,
+    );
+    const inputs = screen.getAllByRole("textbox");
+    fireEvent.change(inputs[0]!, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Log set" }));
+    await vi.waitFor(() => expect(onLog).toHaveBeenCalled());
+    expect(onLog.mock.calls[0][0].weightKg).toBe(0);
+  });
+
+  it("applies no lock when loadType is missing", async () => {
+    const onLog = vi.fn().mockResolvedValue({});
+    render(
+      <SetLogger prType="weight" lastWeightKg={0} lastReps={10} onLog={onLog} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Log set" }));
+    await vi.waitFor(() => expect(onLog).toHaveBeenCalled());
+    expect(onLog.mock.calls[0][0].weightKg).toBe(0);
+  });
+});
+
 describe("SetLogger RPE capture", () => {
   it("logs without rpe when the optional control is left unset", async () => {
     const onLog = vi.fn().mockResolvedValue({});
     render(
       <SetLogger
         prType="weight"
+        loadType="external"
         lastWeightKg={20}
         lastReps={10}
         onLog={onLog}
@@ -42,6 +117,7 @@ describe("SetLogger RPE capture", () => {
     render(
       <SetLogger
         prType="weight"
+        loadType="external"
         lastWeightKg={20}
         lastReps={10}
         onLog={onLog}
@@ -58,6 +134,7 @@ describe("SetLogger RPE capture", () => {
     render(
       <SetLogger
         prType="weight"
+        loadType="external"
         lastWeightKg={20}
         lastReps={10}
         onLog={onLog}

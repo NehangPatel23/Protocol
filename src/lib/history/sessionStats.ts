@@ -35,6 +35,7 @@ export function formatWorkoutDuration(
     return undefined;
   }
   const totalMin = Math.round((end - start) / 60_000);
+  if (totalMin < 1) return "<1m";
   const hours = Math.floor(totalMin / 60);
   const mins = totalMin % 60;
   if (hours === 0) return `${mins}m`;

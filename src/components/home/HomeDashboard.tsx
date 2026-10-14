@@ -262,14 +262,24 @@ export function HomeDashboard() {
   const filterRef = useRef<HTMLDivElement>(null);
 
   const today = localDateKey();
-  const chip = DAY_CHIP[todayKey];
-  const DayIcon = DAY_ICONS[todayKey];
-  const isRest = todayKey === "rest";
-  const missed = isMissedPickup(cycle, today, todayKey);
-  const lifts = assignedExercisesForDay(program, todayKey);
-  const volumeKg = prescribedVolumeKg(program, todayKey);
   const todayRecovery = calendar[today]?.status === "recovery";
   const todayCompleted = calendar[today]?.status === "completed";
+  /** Same-day after Finish: show the day that was logged, not the advanced pointer. */
+  const doneForToday =
+    todayCompleted &&
+    cycle.lastCompletedDate === today &&
+    !todayRecovery;
+  const completedDayKey: DayKey | undefined = calendar[today]?.dayKey;
+  const displayDayKey: DayKey =
+    doneForToday && completedDayKey ? completedDayKey : todayKey;
+  /** After completeTrainingDay the provider todayKey is already the next pointer slot. */
+  const nextUpKey: DayKey | null = doneForToday ? todayKey : null;
+  const chip = DAY_CHIP[displayDayKey];
+  const DayIcon = DAY_ICONS[displayDayKey];
+  const isRest = displayDayKey === "rest" && !doneForToday;
+  const missed = isMissedPickup(cycle, today, todayKey) && !doneForToday;
+  const lifts = assignedExercisesForDay(program, displayDayKey);
+  const volumeKg = prescribedVolumeKg(program, displayDayKey);
   const todaySettled =
     calendar[today] != null && calendar[today].status !== "blank";
   const canLiftAgain = canRevertRecovery(cycle, today) && todayRecovery;
@@ -524,13 +534,13 @@ export function HomeDashboard() {
             ? "Active Recovery"
             : isRest
               ? "Rest Day"
-              : `${DAY_LABELS[todayKey]} Day`}
+              : `${DAY_LABELS[displayDayKey]} Day`}
           <span className="mt-1 block text-[15px] font-medium text-secondary">
             {todayRecovery
               ? recoveringMuscles.length > 0
                 ? recoveringMuscles.map((m) => MUSCLE_LABELS[m]).join(", ")
                 : "Light cardio — let yesterday settle"
-              : DAY_SUBTITLES[todayKey]}
+              : DAY_SUBTITLES[displayDayKey]}
           </span>
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -578,37 +588,54 @@ export function HomeDashboard() {
               Back to today’s lifts
             </button>
           </div>
+        ) : doneForToday ? (
+          <div className="mt-6 flex flex-col gap-2" data-testid="done-for-today">
+            <p className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-border-subtle bg-base text-[14px] font-bold uppercase tracking-[0.08em] text-secondary">
+              <Check className="h-5 w-5 text-accent" aria-hidden />
+              Done for today
+            </p>
+            {nextUpKey ? (
+              <p
+                className="text-center text-[13px] text-muted"
+                data-testid="next-up"
+              >
+                Next up: {DAY_LABELS[nextUpKey]}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                setPanel("lifts");
+                document.getElementById("home-lifts")?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+              }}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 text-[14px] font-semibold text-secondary hover:text-primary"
+            >
+              <Dumbbell className="h-4 w-4" aria-hidden />
+              Today’s lifts
+            </button>
+          </div>
         ) : (
           <div className="mt-6 flex flex-col gap-2">
-            {todayCompleted && !activeSession ? (
-              <p
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-[14px] font-bold uppercase tracking-[0.08em] text-accent-foreground"
-                data-testid="workout-complete"
-              >
-                <Check className="h-5 w-5" aria-hidden />
-                Workout complete
-              </p>
-            ) : (
-              <button
-                type="button"
-                data-testid="start-session"
-                disabled={startingSession}
-                onClick={() => void goToSession()}
-                className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 ${chip.border} ${chip.text} text-[14px] font-bold uppercase tracking-[0.08em] disabled:opacity-60`}
-              >
-                <Play className="h-5 w-5 fill-current" aria-hidden />
-                {activeSession ? "Resume session" : "Start session"}
-              </button>
-            )}
-            {!todayCompleted ? (
-              <ChooseDifferentDay
-                pendingDayKey={todayKey}
-                cycleOrder={cycleOrder}
-                disabled={Boolean(activeSession)}
-                saving={choosingDay}
-                onChoose={confirmChooseDay}
-              />
-            ) : null}
+            <button
+              type="button"
+              data-testid="start-session"
+              disabled={startingSession}
+              onClick={() => void goToSession()}
+              className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 ${chip.border} ${chip.text} text-[14px] font-bold uppercase tracking-[0.08em] disabled:opacity-60`}
+            >
+              <Play className="h-5 w-5 fill-current" aria-hidden />
+              {activeSession ? "Resume session" : "Start session"}
+            </button>
+            <ChooseDifferentDay
+              pendingDayKey={todayKey}
+              cycleOrder={cycleOrder}
+              disabled={Boolean(activeSession)}
+              saving={choosingDay}
+              onChoose={confirmChooseDay}
+            />
             <button
               type="button"
               onClick={() => {
@@ -734,7 +761,7 @@ export function HomeDashboard() {
             <EmptyState
               illustration="program"
               title="No lifts programmed"
-              description={`Nothing is assigned for ${DAY_LABELS[todayKey]}.`}
+              description={`Nothing is assigned for ${DAY_LABELS[displayDayKey]}.`}
               className="py-10"
             />
           ) : (
@@ -745,7 +772,7 @@ export function HomeDashboard() {
                   className={i > 0 ? "border-t border-border-subtle" : undefined}
                 >
                   <Link
-                    href={`/program/${exercise.id}?day=${todayKey}&slot=${todaySlot}`}
+                    href={`/program/${exercise.id}?day=${displayDayKey}&slot=${todaySlot}`}
                     className="block px-4 py-3 hover:bg-surface-raised/50"
                   >
                     <p className="text-[15px] font-semibold text-primary">
