@@ -1,10 +1,10 @@
 "use client";
 
-import { Settings } from "lucide-react";
 import { useAlerts } from "@/components/alerts/AlertProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { usePrefs } from "@/components/PrefsProvider";
 import { useProgram } from "@/components/ProgramProvider";
+import { DataBackupSection } from "@/components/settings/DataBackupSection";
 import { SettingsScreenSkeleton } from "@/components/ui/ScreenLoading";
 import { localDateKey } from "@/lib/db/history";
 import type { WeightUnit } from "@/lib/db/schema";
@@ -149,16 +149,9 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      <DebugCyclePanel />
+      <DataBackupSection />
 
-      <section className="flex flex-col items-center rounded-xl border border-border-subtle bg-surface px-4 py-8 text-center">
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-border-subtle bg-base">
-          <Settings className="h-6 w-6 text-muted" strokeWidth={1.75} aria-hidden />
-        </div>
-        <p className="max-w-sm text-[15px] text-secondary">
-          Theme, rest timer, voice mode, and data tools arrive in a later phase.
-        </p>
-      </section>
+      <DebugCyclePanel />
     </div>
   );
 }
