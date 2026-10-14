@@ -28,7 +28,7 @@ export function TabShell({ children }: { children: ReactNode }) {
           className={
             sessionMode
               ? "min-w-0 flex-1"
-              : "mx-auto w-full max-w-3xl flex-1 px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] pt-4 md:max-w-none md:px-6 md:pb-8 md:pt-6"
+              : "mx-auto w-full max-w-3xl flex-1 px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] pt-[calc(1rem+env(safe-area-inset-top))] md:max-w-none md:px-6 md:pb-8 md:pt-[calc(1.5rem+env(safe-area-inset-top))]"
           }
         >
           {sessionMode ? null : <IosInstallCard />}

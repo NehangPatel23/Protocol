@@ -101,7 +101,13 @@ npm test      # vitest run
 npm run lint
 ```
 
-There is no production deploy. Run it locally.
+---
+
+## Live demo
+
+[https://protocol-brown.vercel.app/](https://protocol-brown.vercel.app/)
+
+The live app is the same local-first build. Logged workouts stay in that browser’s IndexedDB.
 
 ---
 
@@ -119,7 +125,6 @@ Specific, current, not generic:
 - **Settings** currently exposes only the weight-unit toggle (lb / kg). Theme, rest-timer defaults, voice mode, and data export/import are not built. Session rest uses the stored defaults (180s compound / 90s isolation).
 - **Active Session is the Stage 1 loop, not the full §2.3 spec.** No session summary / overload suggestion, no warm-up ramp / plate math / form-refresher, no mid-session reorder or equipment-busy swap, no wake lock. Optional RPE on the shared set logger is now captured.
 - **PWA installability is wired; real-device install is not confirmed here.** `public/manifest.json` (name Protocol, dark `#0B1120` theme/background, standalone), an app-shell service worker (`/sw.js`, registers in production only), and a one-time iOS Share → Add to Home Screen card are in place. **Installing to a home screen and checking the icon / splash / standalone chrome still needs a real iPhone and Android** — same class of check as every other device-level item in this project. Push notifications and a “new version available” banner are still unbuilt (Master Prompt §1.1 / §6.13).
-- **Not deployed.** No live URL. Desktop Chrome can install from `localhost`; a physical phone needs HTTPS (or a tunnel to this machine).
 - **One browser, one device.** No accounts, no sync. Private browsing can drop IndexedDB (the shell warns when persistence looks unavailable). The service worker only caches HTTP app-shell responses; it does not touch IndexedDB, so the persistence probe and that banner are independent of installability.
 
 ---

@@ -169,7 +169,7 @@ export function ActiveSession() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-base">
-      <header className="sticky top-0 z-20 border-b border-border-subtle bg-surface/95 px-4 py-3 backdrop-blur">
+      <header className="sticky top-[env(safe-area-inset-top)] z-20 border-b border-border-subtle bg-surface/95 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-2">
           <button
             type="button"
