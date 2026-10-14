@@ -17,6 +17,9 @@
  *   exercises), 'reps' = bodyweight movements where max reps is the PR,
  *   'inverse-weight' = assisted machines where LESS weight is harder/better
  *   (see Master Prompt §6.4, the assisted pull-up nuance).
+ * - `loadType` says whether weight 0 is valid: 'external' (weight required),
+ *   'bodyweight' (0 = BW, optional added load), 'assisted' (0 = unassisted).
+ *   Missing loadType means no logger lock and no calculation guard.
  * - `icon` maps to the 12 hand-built form pictograms (see the docx build) —
  *   exercises without one of the 12 core patterns get `icon: null` and fall
  *   back to a generic placeholder in the UI.
@@ -35,6 +38,8 @@ export type MuscleGroup =
 export type DayKey = 'push' | 'pull' | 'legs' | 'rest' | 'upper' | 'lower';
 
 export type PRType = 'weight' | 'reps' | 'inverse-weight';
+
+export type LoadType = 'external' | 'bodyweight' | 'assisted';
 
 export interface WeightRange {
   kg: number[];   // one or more values — a range means "progress through these"
@@ -61,6 +66,7 @@ export interface Exercise {
   difficultyTags?: string[];
   icon: string | null;
   prType: PRType;
+  loadType: LoadType;
   cardioFinisher?: { activity: string; durationMin: number };
 }
 
@@ -95,7 +101,7 @@ export const EXERCISES: Exercise[] = [
     mistakes: ['Letting the hips sag or pike up.', 'Flaring elbows straight out to the sides.', 'Only doing a half range of motion.'],
     alternativeId: 'chest-press-machine',
     alternativeNote: 'Chest Press Machine — same pressing pattern with no core/stabilization demand, useful if wrists or shoulders bother you doing push-ups.',
-    icon: 'pushup', prType: 'reps',
+    icon: 'pushup', prType: 'reps', loadType: 'bodyweight',
   },
   {
     id: 'iso-incline-decline-press', name: 'Isolateral Incline/Decline Press', day: 'push',
@@ -111,7 +117,7 @@ export const EXERCISES: Exercise[] = [
     alternativeId: 'pectoral-fly-machine',
     note: "This is your direct swap for the barbell chest press since it lets each arm track its own path and removes the balance/stabilization demand.",
     difficultyTags: ['replaces-barbell-press'],
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'iso-flat-bench-press', name: 'Isolateral Flat Bench Press', day: 'push',
@@ -124,7 +130,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Bouncing the handles at the bottom.', 'Flat back losing contact with the pad.', 'Rushing the eccentric (lowering) portion.'],
     alternativeId: 'chest-press-machine',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'chest-press-machine', name: 'Chest Press Machine', day: 'push',
@@ -139,7 +145,7 @@ export const EXERCISES: Exercise[] = [
     alternativeId: 'iso-flat-bench-press',
     note: "Use this as your main horizontal press since the barbell version isn't clicking — same muscles, guided path, easier to load safely.",
     difficultyTags: ['replaces-barbell-press'],
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'pectoral-fly-machine', name: 'Pectoral Fly Machine', day: 'push',
@@ -152,7 +158,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Bending the elbows more as the set gets harder (turns it into a press).', "Using so much weight you can't control the stretch position.", 'Shrugging shoulders forward instead of keeping them pinned back.'],
     alternativeId: 'decline-db-raises',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'decline-db-raises', name: 'Decline DB Raises (abs bench)', day: 'push',
@@ -165,7 +171,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Letting elbows flare too wide at the bottom.', 'Arching the lower back off the bench.', 'Using more weight than you can control through the full stretch.'],
     alternativeId: 'pectoral-fly-machine',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'bodyweight',
   },
   {
     id: 'overhead-db-press', name: 'Overhead Dumbbell Press', day: 'push',
@@ -178,7 +184,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Excessive lower-back arch to force the weight up.', 'Pressing the dumbbells forward instead of straight up.', 'Flaring elbows too far back at the bottom.'],
     alternativeId: 'shoulder-press-machine',
-    icon: 'ohp', prType: 'weight',
+    icon: 'ohp', prType: 'weight', loadType: 'external',
   },
   {
     id: 'tricep-pushdown', name: 'Tricep Pushdown', day: 'push',
@@ -191,7 +197,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Letting elbows drift forward or out.', 'Using body weight/leaning to help push the bar down.', 'Not controlling the return, letting the weight stack bang.'],
     alternativeId: 'tricep-press-machine',
-    icon: 'tricep', prType: 'weight',
+    icon: 'tricep', prType: 'weight', loadType: 'external',
   },
   {
     id: 'tricep-press-machine', name: 'Tricep Press Machine', day: 'push',
@@ -204,7 +210,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Using shoulders to help drive the movement.', 'Partial range of motion.', 'Slamming the weight stack on the way back.'],
     alternativeId: 'tricep-pushdown',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
     cardioFinisher: { activity: 'Incline treadmill walk', durationMin: 15 },
   },
 
@@ -229,7 +235,7 @@ export const EXERCISES: Exercise[] = [
     alternativeNote: 'Thigh-Supported Back Extension + Row combo — a safer substitute on days your lower back feels off, hitting the same posterior chain without spinal loading.',
     note: "If your back rounds before you can pull the weight off the floor, that's a signal to drop the weight, not push through it.",
     difficultyTags: ['high-difficulty', 'compound', 'form-refresher-priority'],
-    icon: 'deadlift', prType: 'weight',
+    icon: 'deadlift', prType: 'weight', loadType: 'external',
   },
   {
     id: 'row-cable', name: 'Row (cable/machine)', day: 'pull',
@@ -242,7 +248,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Using momentum — rocking the torso to heave the weight.', 'Shrugging shoulders up toward the ears.', 'Pulling to the chest instead of the lower ribs.'],
     alternativeId: 'angled-db-pulls',
-    icon: 'row', prType: 'weight',
+    icon: 'row', prType: 'weight', loadType: 'external',
   },
   {
     id: 'wide-grip-lat-pulldown', name: 'Wide-Grip Lat Pulldown (long bar)', day: 'pull',
@@ -255,7 +261,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Bending the elbows early, turning it into a triceps movement.', 'Using body-swing/momentum instead of controlled lat contraction.', 'Shrugging shoulders up instead of keeping them depressed.'],
     alternativeId: 'weighted-assisted-pullups',
-    icon: 'pulldown', prType: 'weight',
+    icon: 'pulldown', prType: 'weight', loadType: 'external',
   },
   {
     id: 'weighted-assisted-pullups', name: 'Weighted Assisted Pull-ups', day: 'pull',
@@ -270,7 +276,7 @@ export const EXERCISES: Exercise[] = [
     mistakes: ['Kipping/swinging the legs to generate momentum.', 'Only doing the top half of the range.', 'Letting the assist weight do all the work — you should feel your lats working.'],
     alternativeId: 'wide-grip-lat-pulldown',
     note: 'More assist weight = easier rep. Progress by lowering the assist over time, not just adding reps.',
-    icon: 'pullup', prType: 'inverse-weight',
+    icon: 'pullup', prType: 'inverse-weight', loadType: 'assisted',
   },
   {
     id: 'seated-vhandle-chest-pull', name: 'Seated V-Handle Chest Pull (cable row)', day: 'pull',
@@ -283,7 +289,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Using the lower back to rock and heave the weight.', 'Rounding the back at the start of each rep.', 'Letting the shoulders roll forward on the return instead of a controlled stretch.'],
     alternativeId: 'row-cable',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'single-pulley-bar-pulldown', name: 'Single-Pulley Bar Pulldown (seated, leg support)', day: 'pull',
@@ -296,7 +302,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Using the legs to push against the support and cheat the weight down.', 'Yanking the handle instead of a smooth pull.', 'Not controlling the eccentric (return) phase.'],
     alternativeId: 'wide-grip-lat-pulldown',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'thigh-supported-back-extension', name: 'Thigh-Supported Back Extension', day: 'pull',
@@ -309,7 +315,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Rounding the back at the bottom of the movement.', 'Hyperextending past a straight line at the top.', 'Using momentum by bouncing at the bottom.'],
     alternativeId: 'deadlift',
-    icon: null, prType: 'reps',
+    icon: null, prType: 'reps', loadType: 'bodyweight',
   },
   {
     id: 'angled-db-pulls', name: 'Angled Dumbbell Pulls (bent-over row)', day: 'pull',
@@ -322,7 +328,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Rounding the back to compensate for a heavier weight.', 'Standing too upright (turns it into a shrug, not a row).', 'Using momentum/torso jerk to move the weight.'],
     alternativeId: 'row-cable',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'standing-db-curl', name: 'Standing DB Curl', day: 'pull',
@@ -331,7 +337,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Elbows pinned to your sides throughout.', 'Curl up while keeping the upper arm still, squeeze at the top.', 'Lower fully under control.'],
     mistakes: ['Swinging the torso/using momentum to heave the weight up.', 'Letting elbows drift forward as the set fatigues.', 'Only doing partial reps at the top.'],
     alternativeId: 'cable-bar-curl',
-    icon: 'curl', prType: 'weight',
+    icon: 'curl', prType: 'weight', loadType: 'external',
   },
   {
     id: 'hammer-curl', name: 'Hammer Curl', day: 'pull',
@@ -340,7 +346,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Palms face each other (neutral grip) the entire rep.', 'Elbows stay at your sides, curl straight up.', 'Control the lowering phase fully.'],
     mistakes: ['Rotating the wrist mid-curl (turns it into a regular curl).', 'Swinging the shoulders to generate momentum.', 'Rushing the eccentric.'],
     alternativeId: 'db-reverse-curl',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
 
   // ============================= LEGS =============================
@@ -351,7 +357,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Feet shoulder-width, toes slightly turned out.', 'Sit back and down like sitting into a chair, chest stays upright.', "Knees track over your toes — don't let them cave inward."],
     mistakes: ['Knees caving in (valgus collapse).', 'Heels lifting off the floor.', 'Rounding the lower back at the bottom.'],
     alternativeId: 'seated-leg-press',
-    icon: 'squat', prType: 'reps',
+    icon: 'squat', prType: 'reps', loadType: 'bodyweight',
   },
   {
     id: 'weighted-squat', name: 'Weighted Squat (barbell or V-squat machine)', day: 'legs',
@@ -366,7 +372,7 @@ export const EXERCISES: Exercise[] = [
     mistakes: ['Bar drifting forward, pulling you onto your toes.', 'Not hitting full depth consistently — half-reps limit muscle growth.', 'Losing core brace and rounding the lower back under load.'],
     alternativeId: 'seated-leg-press',
     difficultyTags: ['high-difficulty', 'compound', 'form-refresher-priority'],
-    icon: 'squat', prType: 'weight',
+    icon: 'squat', prType: 'weight', loadType: 'external',
   },
   {
     id: 'seated-leg-press', name: 'Seated Leg Press', day: 'legs',
@@ -379,7 +385,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Letting the lower back lift off the pad at the bottom.', 'Locking the knees out aggressively at the top.', 'Placing feet too high or too low without meaning to.'],
     alternativeId: 'weighted-squat',
-    icon: 'legpress', prType: 'weight',
+    icon: 'legpress', prType: 'weight', loadType: 'external',
   },
   {
     id: 'leg-extension', name: 'Leg Extension', day: 'legs',
@@ -392,7 +398,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Using momentum by kicking the weight up.', 'Only doing a partial range of motion.', 'Gripping the handles so hard you arch off the seat.'],
     alternativeId: 'seated-leg-press',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'one-legged-platform-climb', name: 'One-Legged Platform Climb', day: 'legs',
@@ -405,7 +411,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Pushing off the bottom leg to assist the climb.', 'Letting the working knee cave inward.', 'Rushing the descent instead of controlling it.'],
     alternativeId: 'lunges',
-    icon: null, prType: 'reps',
+    icon: null, prType: 'reps', loadType: 'bodyweight',
   },
   {
     id: 'calf-raise-machine', name: 'Calf Raise Machine', day: 'legs',
@@ -418,7 +424,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Bouncing at the bottom instead of pausing in the stretch.', 'Using a tiny, partial range of motion.', 'Rushing through the set instead of controlling tempo.'],
     alternativeId: 'calf-extension-machine',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
     cardioFinisher: { activity: 'Stationary cycling', durationMin: 10 },
   },
 
@@ -435,7 +441,7 @@ export const EXERCISES: Exercise[] = [
     mistakes: ["Trying to match or beat your Push-day weight here — this session exists for extra volume, not a new PR.", 'Bouncing the handles at the bottom.', 'Rushing the eccentric.'],
     alternativeId: 'chest-press-machine',
     note: "This is what actually gets your chest to true 2x/week frequency — without it, chest would only be trained once.",
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'wide-grip-lat-pulldown', name: 'Wide-Grip Lat Pulldown (2nd weekly back session)', day: 'upper',
@@ -449,7 +455,7 @@ export const EXERCISES: Exercise[] = [
     mistakes: ["Loading it as heavy as your Pull-day session — you'll cut into recovery for the next Pull day.", 'Using body-swing to move more weight than you should here.'],
     alternativeId: 'row-cable',
     note: 'This is what gets your back to true 2x/week frequency.',
-    icon: 'pulldown', prType: 'weight',
+    icon: 'pulldown', prType: 'weight', loadType: 'external',
   },
   {
     id: 'shoulder-press-machine', name: 'Shoulder Press Machine', day: 'upper',
@@ -458,7 +464,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Seat height so handles start level with your shoulders.', 'Press straight up without arching your lower back off the pad.', 'Lower under control back to shoulder height.'],
     mistakes: ['Arching the back to help push the weight up.', 'Pressing the handles forward instead of straight overhead.', 'Locking elbows out hard at the top.'],
     alternativeId: 'overhead-db-press',
-    icon: 'ohp', prType: 'weight',
+    icon: 'ohp', prType: 'weight', loadType: 'external',
   },
   {
     id: 'db-side-front-raises', name: 'DB Side & Front Raises', day: 'upper',
@@ -467,7 +473,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Slight bend in the elbow, raise to shoulder height — no higher.', 'Lead with the elbows, not the hands.', "Lower with control, don't let the weight drop."],
     mistakes: ['Swinging/using momentum to fling the weight up.', 'Raising above shoulder height, which shifts stress to the traps.', 'Shrugging the shoulders up during the raise.'],
     note: 'Cable lateral raise, if that station is ever available — otherwise this is your best option as-is.',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'db-shoulder-shrugs', name: 'DB Shoulder Shrugs', day: 'upper',
@@ -476,7 +482,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Arms straight, dumbbells at your sides.', 'Raise your shoulders straight up toward your ears, squeeze at the top.', "Lower with control, don't just drop."],
     mistakes: ['Rolling the shoulders in a circle instead of a straight up-down path.', 'Using momentum/bouncing instead of a controlled squeeze.', 'Bending the elbows to help lift the weight.'],
     note: 'Row with an extra top-of-rep shoulder-blade squeeze — partial overlap, not a full substitute, but works in a pinch.',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'seated-incline-db-curl', name: 'Seated Incline DB Curl', day: 'upper',
@@ -485,7 +491,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Sit back fully on the incline bench, arms hanging straight down.', "Curl without letting your elbows drift forward.", 'Get a full stretch at the bottom of every rep.'],
     mistakes: ['Elbows drifting forward as the set gets hard.', 'Not achieving a full stretch at the bottom.', 'Rushing the lowering phase.'],
     alternativeId: 'standing-db-curl',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'db-reverse-curl', name: 'DB Reverse Curl', day: 'upper',
@@ -494,7 +500,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Palms face down (overhand grip) throughout.', 'Curl with elbows pinned at your sides, focusing on the forearms/brachialis.', 'Lower fully under control.'],
     mistakes: ['Rotating the wrist mid-rep.', "Using much lighter weight than you'd expect for a regular curl — that's normal with this grip, don't force heavier loads.", 'Swinging the torso for momentum.'],
     alternativeId: 'hammer-curl',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'db-cross-body-curl', name: 'DB Cross-Body Curl', day: 'upper',
@@ -503,7 +509,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Curl the dumbbell diagonally up toward the opposite shoulder.', 'Keep the elbow relatively fixed at your side.', 'Lower with control back to the start.'],
     mistakes: ['Swinging the dumbbell across instead of a controlled diagonal path.', 'Letting the elbow drift away from the body.', 'Using momentum from the hips.'],
     alternativeId: 'standing-db-curl',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'db-behind-head-curl', name: 'DB Behind-the-Head Curl', day: 'upper',
@@ -516,7 +522,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Moving too fast through a movement meant to emphasize the stretch.', 'Letting the elbows flare wide.', 'Using too much weight, which limits range of motion behind the head.'],
     alternativeId: 'preacher-curl',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'cable-bar-curl', name: 'Cable Bar Curl', day: 'upper',
@@ -525,7 +531,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Elbows pinned at your sides, standing tall.', 'Curl the bar up under control, squeeze at the top.', 'Lower slowly for a full stretch.'],
     mistakes: ['Leaning back to heave the bar up.', 'Letting elbows drift forward.', 'Cutting the range of motion short at the bottom.'],
     alternativeId: 'machine-biceps-curl',
-    icon: 'curl', prType: 'weight',
+    icon: 'curl', prType: 'weight', loadType: 'external',
   },
   {
     id: 'machine-biceps-curl', name: 'Machine Biceps Curl', day: 'upper',
@@ -534,7 +540,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Upper arms flat against the pad the whole set.', 'Curl through a full range, squeeze at the top.', 'Control the negative fully.'],
     mistakes: ['Lifting the upper arms off the pad to cheat the weight up.', 'Partial reps.', 'Letting the weight stack slam on the way down.'],
     alternativeId: 'cable-bar-curl',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'reverse-tricep-pushdown', name: 'Reverse Tricep Pushdown (palms up)', day: 'upper',
@@ -543,7 +549,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Underhand grip, elbows pinned to your sides.', 'Push down through full extension, squeeze the triceps.', "Control the return, don't let elbows flare."],
     mistakes: ['Letting elbows drift away from the body.', 'Using body-weight/leaning to assist the push.', 'Rushing the eccentric.'],
     alternativeId: 'tricep-pushdown',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'preacher-curl', name: 'Preacher Curl', day: 'upper',
@@ -556,7 +562,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Bouncing out of the bottom stretch position (elbow strain risk).', 'Lifting the upper arms off the pad.', 'Using momentum from the shoulders.'],
     alternativeId: 'db-behind-head-curl',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
     cardioFinisher: { activity: 'Elliptical', durationMin: 20 },
   },
 
@@ -572,7 +578,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Front knee traveling past the toes and collapsing inward.', 'Leaning the torso too far forward.', 'Back knee slamming into the floor.'],
     alternativeId: 'one-legged-platform-climb',
-    icon: 'lunge', prType: 'reps',
+    icon: 'lunge', prType: 'reps', loadType: 'bodyweight',
   },
   {
     id: 'leg-extension', name: 'Leg Extension (2nd weekly quad session)', day: 'lower',
@@ -586,7 +592,7 @@ export const EXERCISES: Exercise[] = [
     mistakes: ['Trying to match your Legs-day weight here.', 'Using momentum by kicking the weight up.', 'Partial range of motion.'],
     alternativeNote: 'A lighter set on the Seated Leg Press (feet low on the platform) works as a substitute.',
     note: "This is what gets your quads to true 2x/week frequency — without it, quads would only be trained once.",
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'seated-leg-curl', name: 'Seated Leg Curl', day: 'lower',
@@ -599,7 +605,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Using momentum by jerking the weight.', 'Lifting the hips off the seat to cheat the rep.', 'Only doing a partial range of motion.'],
     alternativeId: 'lying-standing-leg-curl',
-    icon: 'legcurl', prType: 'weight',
+    icon: 'legcurl', prType: 'weight', loadType: 'external',
   },
   {
     id: 'lying-standing-leg-curl', name: 'Lying/Standing Leg Curl', day: 'lower',
@@ -608,7 +614,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Hips pressed into the pad/bench, no arching.', 'Curl the heel toward your glutes under control.', 'Lower with control for a full stretch.'],
     mistakes: ['Hips lifting off the pad to swing the weight up.', 'Rushing the eccentric.', 'Partial range of motion.'],
     alternativeId: 'seated-leg-curl',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'glute-machine', name: 'Glute Machine', day: 'lower',
@@ -621,7 +627,7 @@ export const EXERCISES: Exercise[] = [
     ],
     mistakes: ['Overarching the lower back to add range of motion.', 'Using momentum/swinging instead of a controlled squeeze.', 'Rushing through reps instead of pausing at the top contraction.'],
     alternativeId: 'lunges',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
   },
   {
     id: 'calf-extension-machine', name: 'Calf Extension Machine', day: 'lower',
@@ -630,7 +636,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Full stretch at the bottom, heels dropping as low as comfortable.', 'Rise fully onto your toes and pause briefly at the top.', 'Control the lowering phase.'],
     mistakes: ['Bouncing instead of pausing at the top and bottom.', 'Using a short, partial range of motion.', 'Rushing through the set instead of controlling tempo.'],
     alternativeId: 'calf-raise-machine',
-    icon: null, prType: 'weight',
+    icon: null, prType: 'weight', loadType: 'external',
     cardioFinisher: { activity: 'Incline treadmill walk/run', durationMin: 20 },
   },
 ];
@@ -657,25 +663,25 @@ const LEG_RAISE_MISTAKES = [
 ];
 
 /** Core finishers (ab curls + leg raises) logged on Pull and Upper days — see Master Prompt program summary. */
-export const CORE_FINISHERS: Pick<Exercise, 'id' | 'name' | 'day' | 'muscles' | 'sets' | 'reps' | 'weight' | 'icon' | 'prType' | 'cues' | 'mistakes'>[] = [
+export const CORE_FINISHERS: Pick<Exercise, 'id' | 'name' | 'day' | 'muscles' | 'sets' | 'reps' | 'weight' | 'icon' | 'prType' | 'loadType' | 'cues' | 'mistakes'>[] = [
   {
     id: 'ab-curls-pull', name: 'Ab Curls', day: 'pull',
-    muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps',
+    muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps', loadType: 'bodyweight',
     cues: AB_CURL_CUES, mistakes: AB_CURL_MISTAKES,
   },
   {
     id: 'leg-raises-pull', name: 'Leg Raises', day: 'pull',
-    muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps',
+    muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps', loadType: 'bodyweight',
     cues: LEG_RAISE_CUES, mistakes: LEG_RAISE_MISTAKES,
   },
   {
     id: 'ab-curls-upper', name: 'Ab Curls', day: 'upper',
-    muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps',
+    muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps', loadType: 'bodyweight',
     cues: AB_CURL_CUES, mistakes: AB_CURL_MISTAKES,
   },
   {
     id: 'leg-raises-upper', name: 'Leg Raises', day: 'upper',
-    muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps',
+    muscles: { primary: ['core'] }, sets: 3, reps: '15', weight: 'bodyweight', icon: null, prType: 'reps', loadType: 'bodyweight',
     cues: LEG_RAISE_CUES, mistakes: LEG_RAISE_MISTAKES,
   },
 ];

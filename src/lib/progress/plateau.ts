@@ -7,7 +7,7 @@
 
 import type { HistoryEntry } from "@/lib/db/history";
 import type { Prefs } from "@/lib/db/schema";
-import type { PRType, ProgramRecord } from "@/lib/program/types";
+import type { LoadType, PRType, ProgramRecord } from "@/lib/program/types";
 import {
   beats,
   bestPRFromHistory,
@@ -33,10 +33,11 @@ function workingSessions(
   entries: HistoryEntry[],
   warmup: WarmupPrescription | undefined,
   today: string,
+  loadType?: LoadType | null,
 ): HistoryEntry[] {
   return [...entries]
     .filter((entry) => entry.date <= today)
-    .filter((entry) => entry.sets.some((s) => isWorkingSet(s, warmup)))
+    .filter((entry) => entry.sets.some((s) => isWorkingSet(s, warmup, loadType)))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -44,8 +45,9 @@ function bestOfSession(
   entry: HistoryEntry,
   prType: PRType,
   warmup: WarmupPrescription | undefined,
+  loadType?: LoadType | null,
 ): PersonalRecord | null {
-  return bestPRFromHistory([entry], prType, warmup);
+  return bestPRFromHistory([entry], prType, warmup, loadType);
 }
 
 function isSessionProgress(
@@ -70,11 +72,12 @@ function sessionProgressed(
   previous: HistoryEntry,
   prType: PRType,
   warmup: WarmupPrescription | undefined,
+  loadType?: LoadType | null,
 ): boolean {
-  const prevBest = bestOfSession(previous, prType, warmup);
+  const prevBest = bestOfSession(previous, prType, warmup, loadType);
   if (!prevBest) return true;
   for (const set of current.sets) {
-    if (!isWorkingSet(set, warmup)) continue;
+    if (!isWorkingSet(set, warmup, loadType)) continue;
     if (
       isSessionProgress(
         { weightKg: set.weightKg, reps: set.reps, date: current.date },
@@ -108,12 +111,20 @@ export function detectPlateaus(
     const lib = program.exercises[exerciseId];
     if (!lib) continue;
     const warmup = warmupPrescriptionFor(program, exerciseId);
-    const sessions = workingSessions(entries, warmup, today);
+    const sessions = workingSessions(entries, warmup, today, lib.loadType);
     if (sessions.length < PLATEAU_SESSION_COUNT) continue;
     const window = sessions.slice(-PLATEAU_SESSION_COUNT);
     let progressed = false;
     for (let i = 1; i < window.length; i++) {
-      if (sessionProgressed(window[i], window[i - 1], lib.prType, warmup)) {
+      if (
+        sessionProgressed(
+          window[i],
+          window[i - 1],
+          lib.prType,
+          warmup,
+          lib.loadType,
+        )
+      ) {
         progressed = true;
         break;
       }
@@ -123,7 +134,12 @@ export function detectPlateaus(
       exerciseId,
       name: lib.name,
       sessionDates: window.map((e) => e.date),
-      stalledBest: bestOfSession(window[window.length - 1], lib.prType, warmup),
+      stalledBest: bestOfSession(
+        window[window.length - 1],
+        lib.prType,
+        warmup,
+        lib.loadType,
+      ),
     });
   }
   flags.sort((a, b) => a.name.localeCompare(b.name));

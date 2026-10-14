@@ -30,7 +30,7 @@ export function buildPRWall(
     const lib = program.exercises[exerciseId];
     const prType: PRType = lib?.prType ?? "weight";
     const warmup = warmupPrescriptionFor(program, exerciseId);
-    const record = bestPRFromHistory(entries, prType, warmup);
+    const record = bestPRFromHistory(entries, prType, warmup, lib?.loadType);
     if (!record) continue;
     items.push({
       exerciseId,

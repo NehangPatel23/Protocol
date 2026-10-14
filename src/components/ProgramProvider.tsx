@@ -197,7 +197,41 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
         setProgram(loaded);
         setNotes(loadedNotes);
         setHistory(loadedHistory);
-        setPRs(loadedPRs);
+        // Live PR detection always uses history via bestPRFromHistory — never
+        // the prs store as previousBest. Reconcile the write-through snapshot
+        // so a stale 0 kg external PR cannot linger in IndexedDB / context.
+        const reconciledPRs: Record<string, PersonalRecord> = {};
+        const exerciseIds = new Set([
+          ...Object.keys(loadedHistory),
+          ...Object.keys(loadedPRs),
+        ]);
+        for (const exerciseId of exerciseIds) {
+          const lib = loaded.exercises[exerciseId];
+          const nextPR = bestPRFromHistory(
+            loadedHistory[exerciseId] ?? [],
+            lib?.prType ?? "weight",
+            warmupPrescriptionFor(loaded, exerciseId),
+            lib?.loadType,
+          );
+          if (nextPR) reconciledPRs[exerciseId] = nextPR;
+          const prev = loadedPRs[exerciseId];
+          const same =
+            prev &&
+            nextPR &&
+            prev.weightKg === nextPR.weightKg &&
+            prev.reps === nextPR.reps &&
+            prev.date === nextPR.date &&
+            prev.est1RM === nextPR.est1RM;
+          if (same) continue;
+          try {
+            if (nextPR) await savePR(exerciseId, nextPR);
+            else await deletePR(exerciseId);
+          } catch (err) {
+            console.error("[protocol/program] PR reconcile failed", err);
+          }
+        }
+        if (cancelled) return;
+        setPRs(reconciledPRs);
         setSoreness(storedSoreness);
         const todayKey = localDateKey();
         const order =
@@ -270,9 +304,10 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
 
   const persistPRForExercise = useCallback(
     async (exerciseId: string, entries: HistoryEntry[]) => {
-      const prType = program.exercises[exerciseId]?.prType ?? "weight";
+      const lib = program.exercises[exerciseId];
+      const prType = lib?.prType ?? "weight";
       const warmup = warmupPrescriptionFor(program, exerciseId);
-      const nextPR = bestPRFromHistory(entries, prType, warmup);
+      const nextPR = bestPRFromHistory(entries, prType, warmup, lib?.loadType);
       if (persistenceOk !== false) {
         try {
           if (nextPR) await savePR(exerciseId, nextPR);
@@ -310,10 +345,23 @@ export function ProgramProvider({ children }: { children: ReactNode }) {
       };
       const date = input.date ?? localDateKey();
       const previousEntries = history[exerciseId] ?? [];
-      const prType = program.exercises[exerciseId]?.prType ?? "weight";
+      const lib = program.exercises[exerciseId];
+      const prType = lib?.prType ?? "weight";
       const warmup = warmupPrescriptionFor(program, exerciseId, input.dayKey);
-      const previousBest = bestPRFromHistory(previousEntries, prType, warmup);
-      const isPR = setEstablishesPR(set, date, previousBest, prType, warmup);
+      const previousBest = bestPRFromHistory(
+        previousEntries,
+        prType,
+        warmup,
+        lib?.loadType,
+      );
+      const isPR = setEstablishesPR(
+        set,
+        date,
+        previousBest,
+        prType,
+        warmup,
+        lib?.loadType,
+      );
       const nextEntries = appendSet(previousEntries, set, date, input.dayKey);
       if (persistenceOk !== false) {
         try {

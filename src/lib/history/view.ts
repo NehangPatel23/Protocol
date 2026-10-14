@@ -11,7 +11,12 @@ import {
   type CalendarEntry,
   type CalendarStatus,
 } from "@/lib/program/cycle";
-import type { DayKey, PRType, ProgramRecord } from "@/lib/program/types";
+import type {
+  DayKey,
+  LoadType,
+  PRType,
+  ProgramRecord,
+} from "@/lib/program/types";
 import { sessionDetailStats } from "./sessionStats";
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"] as const;
@@ -92,6 +97,7 @@ export interface DayExerciseLog {
   exerciseId: string;
   name: string;
   prType: PRType;
+  loadType?: LoadType;
   sets: HistorySet[];
   dayKey?: DayKey;
 }
@@ -130,6 +136,7 @@ function exercisesOnDate(
       exerciseId,
       name: lib?.name ?? exerciseId,
       prType: lib?.prType ?? "weight",
+      loadType: lib?.loadType,
       sets: entry.sets,
       dayKey: entry.dayKey,
     });

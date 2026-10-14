@@ -519,6 +519,17 @@ function SessionDetail({
               {item.exercises.map((ex) => {
                 const load = topLoadKg(ex.sets, ex.prType);
                 const est = bestEst1RM(ex.sets);
+                const externalZero =
+                  ex.loadType === "external" && load === 0;
+                const topLoadLabel = externalZero
+                  ? "—"
+                  : load === 0
+                    ? "BW"
+                    : `${kgToDisplay(load, units)} ${unitLabel(units)}`;
+                const estLabel =
+                  externalZero || est === null
+                    ? "—"
+                    : kgToDisplay(est, units).toFixed(1);
                 return (
                   <tr
                     key={ex.exerciseId}
@@ -532,14 +543,10 @@ function SessionDetail({
                       {setScheme(ex.sets)}
                     </td>
                     <td className="py-2.5 pr-2 text-accent">
-                      {load === 0
-                        ? "BW"
-                        : `${kgToDisplay(load, units)} ${unitLabel(units)}`}
+                      {topLoadLabel}
                     </td>
                     <td className="py-2.5 pr-4 text-primary">
-                      {est === null
-                        ? "—"
-                        : kgToDisplay(est, units).toFixed(1)}
+                      {estLabel}
                     </td>
                   </tr>
                 );

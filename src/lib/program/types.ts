@@ -6,6 +6,7 @@
 
 export type {
   DayKey,
+  LoadType,
   MuscleGroup,
   PRType,
   WeightRange,
@@ -18,6 +19,7 @@ export {
 
 import type {
   DayKey,
+  LoadType,
   MuscleGroup,
   PRType,
   WeightRange,
@@ -38,6 +40,8 @@ export interface LibraryExercise {
   difficultyTags?: string[];
   icon: string | null;
   prType: PRType;
+  /** Absent on unknown/custom ids — no logger lock and no calc guard. */
+  loadType?: LoadType;
 }
 
 /**

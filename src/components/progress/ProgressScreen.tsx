@@ -9,7 +9,7 @@ import { useProgram } from "@/components/ProgramProvider";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProgressScreenSkeleton } from "@/components/ui/ScreenLoading";
 import { RpeTrendChart } from "@/components/progress/RpeTrendChart";
-import { loadAllBadges, persistBadges } from "@/lib/db/badges";
+import { deleteBadge, loadAllBadges, persistBadges } from "@/lib/db/badges";
 import { loadCalendar } from "@/lib/db/cycle";
 import { loadAllHistory, localDateKey, type HistoryEntry } from "@/lib/db/history";
 import type { Prefs, WeightUnit } from "@/lib/db/schema";
@@ -586,12 +586,13 @@ export function ProgressScreen() {
       const prev = storedMap[badge.id];
       return !prev || prev.earnedDate !== badge.earnedDate;
     });
-    if (dirty.length > 0) {
-      try {
-        await persistBadges(dirty);
-      } catch (err) {
-        console.error("[protocol/progress] badge persist failed", err);
+    try {
+      if (dirty.length > 0) await persistBadges(dirty);
+      if (storedMap["first-pr"] && !merged.some((b) => b.id === "first-pr")) {
+        await deleteBadge("first-pr");
       }
+    } catch (err) {
+      console.error("[protocol/progress] badge persist failed", err);
     }
   }, [program, today]);
 

@@ -210,6 +210,7 @@ export function ExerciseDetail({ exerciseId, dayKey }: ExerciseDetailProps) {
       <SetLogger
         key={exercise.id}
         prType={exercise.prType}
+        loadType={exercise.loadType}
         lastWeightKg={lastSet?.weightKg}
         lastReps={lastSet?.reps}
         prescribedWeightKg={prescribedKg}

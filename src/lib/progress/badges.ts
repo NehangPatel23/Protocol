@@ -144,12 +144,15 @@ export function computeBadges(
 
 /**
  * Union computed + stored. Keep the earlier earnedDate so a later recompute
- * doesn't "re-earn" a badge on today.
+ * doesn't "re-earn" a badge on today. `first-pr` is dropped when guarded
+ * history no longer qualifies; other badges are never removed.
  */
 export function mergeBadges(computed: Badge[], stored: Badge[]): Badge[] {
+  const computedIds = new Set(computed.map((b) => b.id));
   const byId = new Map<BadgeId, Badge>();
   for (const badge of stored) {
     if (!BADGE_IDS.includes(badge.id)) continue;
+    if (badge.id === "first-pr" && !computedIds.has("first-pr")) continue;
     byId.set(badge.id, badge);
   }
   for (const badge of computed) {

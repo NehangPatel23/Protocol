@@ -5,7 +5,7 @@
 
 import type { HistoryEntry } from "@/lib/db/history";
 import { addLocalDays } from "@/lib/program/cycle";
-import type { ProgramRecord } from "@/lib/program/types";
+import type { LoadType, ProgramRecord } from "@/lib/program/types";
 import {
   bestPRFromHistory,
   warmupPrescriptionFor,
@@ -47,11 +47,12 @@ export function windowHasWorkingSets(
   range: DateRange,
 ): boolean {
   for (const [exerciseId, entries] of Object.entries(history)) {
+    const loadType = program.exercises[exerciseId]?.loadType;
     const warmup = warmupPrescriptionFor(program, exerciseId);
     for (const entry of entries) {
       if (!inDateRange(entry.date, range.start, range.end)) continue;
       for (const set of entry.sets) {
-        if (isWorkingSet(set, warmup)) return true;
+        if (isWorkingSet(set, warmup, loadType)) return true;
       }
     }
   }
@@ -137,12 +138,13 @@ function countWorkingSets(
   entries: HistoryEntry[],
   range: DateRange,
   warmup: ReturnType<typeof warmupPrescriptionFor>,
+  loadType?: LoadType | null,
 ): number {
   let count = 0;
   for (const entry of entries) {
     if (!inDateRange(entry.date, range.start, range.end)) continue;
     for (const set of entry.sets) {
-      if (isWorkingSet(set, warmup)) count += 1;
+      if (isWorkingSet(set, warmup, loadType)) count += 1;
     }
   }
   return count;
@@ -166,8 +168,18 @@ export function compareExerciseVolume(
     const lib = program.exercises[exerciseId];
     if (!lib) continue;
     const warmup = warmupPrescriptionFor(program, exerciseId);
-    const recentSets = countWorkingSets(entries, windows.recent, warmup);
-    const previousSets = countWorkingSets(entries, windows.previous, warmup);
+    const recentSets = countWorkingSets(
+      entries,
+      windows.recent,
+      warmup,
+      lib.loadType,
+    );
+    const previousSets = countWorkingSets(
+      entries,
+      windows.previous,
+      warmup,
+      lib.loadType,
+    );
     if (recentSets === 0 && previousSets === 0) continue;
     const prType = lib.prType ?? "weight";
     rows.push({
@@ -179,11 +191,13 @@ export function compareExerciseVolume(
         entriesInRange(entries, windows.recent),
         prType,
         warmup,
+        lib.loadType,
       ),
       previousBest: bestPRFromHistory(
         entriesInRange(entries, windows.previous),
         prType,
         warmup,
+        lib.loadType,
       ),
     });
   }

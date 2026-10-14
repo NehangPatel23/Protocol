@@ -1,5 +1,5 @@
-import { getDB, setStoreValue } from "./index";
-import type { Badge } from "@/lib/progress/badges";
+import { deleteStoreValue, getDB, setStoreValue } from "./index";
+import type { Badge, BadgeId } from "@/lib/progress/badges";
 
 export async function loadAllBadges(): Promise<Record<string, Badge>> {
   const db = await getDB();
@@ -17,6 +17,10 @@ export async function loadAllBadges(): Promise<Record<string, Badge>> {
 
 export async function saveBadge(badge: Badge): Promise<void> {
   await setStoreValue("badges", badge.id, badge);
+}
+
+export async function deleteBadge(id: BadgeId): Promise<void> {
+  await deleteStoreValue("badges", id);
 }
 
 export async function persistBadges(badges: Badge[]): Promise<void> {

@@ -8,7 +8,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { displayToKg, kgToDisplay, unitLabel } from "@/lib/program/format";
 import { matchesWarmupPattern, type WarmupPrescription } from "@/lib/progress/prs";
 import { parseRpe } from "@/lib/progress/rpe";
-import type { PRType } from "@/lib/program/types";
+import type { LoadType, PRType } from "@/lib/program/types";
 
 export interface LogSetPayload {
   weightKg: number;
@@ -19,6 +19,8 @@ export interface LogSetPayload {
 
 interface SetLoggerProps {
   prType: PRType;
+  /** When missing, no lock — unknown/custom exercises stay unrestricted. */
+  loadType?: LoadType | null;
   lastWeightKg?: number;
   lastReps?: number;
   prescribedWeightKg?: number | null;
@@ -37,7 +39,7 @@ function parseNonNeg(raw: string): number | null {
 }
 
 export function SetLogger({
-  prType,
+  loadType,
   lastWeightKg,
   lastReps,
   prescribedWeightKg,
@@ -49,12 +51,15 @@ export function SetLogger({
   const { prefs } = usePrefs();
   const alerts = useAlerts();
   const units = prefs.units;
-  const bodyweight = prType === "reps";
+  const allowsZeroLoad =
+    loadType === "bodyweight" || loadType === "assisted";
   const defaultKg = lastWeightKg ?? prescribedWeightKg ?? 0;
   const defaultReps = lastReps ?? prescribedReps ?? 5;
 
   const [weight, setWeight] = useState(
-    bodyweight && defaultKg === 0 ? "0" : String(kgToDisplay(defaultKg, units)),
+    allowsZeroLoad && defaultKg === 0
+      ? "0"
+      : String(kgToDisplay(defaultKg, units)),
   );
   const [reps, setReps] = useState(String(defaultReps));
   const [saving, setSaving] = useState(false);
@@ -115,8 +120,18 @@ export function SetLogger({
     const w = parseNonNeg(weight);
     const r = parseNonNeg(reps);
     if (w === null) {
-      setHint("Enter a weight of 0 or more.");
-      alerts.warning("Enter a weight of 0 or more.");
+      if (loadType === "external") {
+        setHint("Enter a weight greater than 0 for this lift.");
+        alerts.warning("Enter a weight greater than 0 for this lift.");
+      } else {
+        setHint("Enter a weight of 0 or more.");
+        alerts.warning("Enter a weight of 0 or more.");
+      }
+      return;
+    }
+    if (loadType === "external" && w === 0) {
+      setHint("Enter a weight greater than 0 for this lift.");
+      alerts.warning("Enter a weight greater than 0 for this lift.");
       return;
     }
     if (r === null || !Number.isInteger(r)) {
@@ -131,6 +146,11 @@ export function SetLogger({
       return;
     }
     const weightKg = displayToKg(w, units);
+    if (loadType === "external" && !(weightKg > 0)) {
+      setHint("Enter a weight greater than 0 for this lift.");
+      alerts.warning("Enter a weight greater than 0 for this lift.");
+      return;
+    }
     if (weightKg > 400 && !confirmHeavy) {
       setConfirmHeavy(true);
       setHint("That’s well outside a typical range — tap Log set again to confirm.");
@@ -188,7 +208,7 @@ export function SetLogger({
         <div>
           <p className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
             Weight ({unitLabel(units)})
-            {bodyweight ? " · 0 = BW" : null}
+            {loadType === "bodyweight" ? " · 0 = BW" : null}
           </p>
           <div className="flex items-stretch gap-1">
             <button

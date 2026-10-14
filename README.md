@@ -15,7 +15,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/roadmap-Stage_4_in_progress-14b8a6?style=flat-square" alt="Roadmap: Stage 4 in progress" />
-  <img src="https://img.shields.io/badge/tests-265_passing-8b5cf6?style=flat-square" alt="265 tests passing" />
+  <img src="https://img.shields.io/badge/tests-269_passing-8b5cf6?style=flat-square" alt="269 tests passing" />
   <img src="https://img.shields.io/badge/stack-Next.js_15_·_IndexedDB-0ea5e9?style=flat-square" alt="Next.js 15 and IndexedDB" />
   <img src="https://img.shields.io/badge/status-personal_project_·_pre--alpha-6b7280?style=flat-square" alt="Personal project, pre-alpha" />
 </p>
@@ -81,7 +81,7 @@ Natural next increment on History (not built): search / filter by exercise, date
 | App | Next.js 15.5.24 (App Router), React 19.1.0, TypeScript |
 | UI | Tailwind CSS 4, lucide-react, recharts |
 | Persistence | IndexedDB via `idb` 8 (database name `protocol`, schema v2) |
-| Tests | Vitest 4 — **265 passing** across 42 files (`npm test`, 2026-09-27) |
+| Tests | Vitest 4 — **269 passing** across 42 files (`npm test`, 2026-10-13) |
 
 No backend. No auth. Data lives in the browser that logged it.
 

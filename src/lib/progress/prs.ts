@@ -6,7 +6,12 @@
 import type { HistoryEntry, HistorySet } from "@/lib/db/history";
 import { epley1RM, parseRepsFor1RM } from "@/lib/program/format";
 import { isDayKey } from "@/lib/program/days";
-import type { PRType, ProgramRecord, WeightRange } from "@/lib/program/types";
+import type {
+  LoadType,
+  PRType,
+  ProgramRecord,
+  WeightRange,
+} from "@/lib/program/types";
 
 export interface PersonalRecord {
   weightKg: number;
@@ -52,11 +57,25 @@ export function matchesWarmupPattern(
   );
 }
 
-/** Explicit flag or programmed warmup pattern (deadlift 3×10 @ 20 kg). */
+/**
+ * External lifts require a positive load. Missing/unknown loadType applies
+ * no guard — never silently drop sets for custom or untyped exercises.
+ */
+export function isInvalidExternalLoad(
+  set: Pick<HistorySet, "weightKg">,
+  loadType?: LoadType | null,
+): boolean {
+  if (loadType == null) return false;
+  return loadType === "external" && !(set.weightKg > 0);
+}
+
+/** Explicit flag, programmed warmup pattern, or invalid external 0-load. */
 export function isExcludedFromPR(
   set: HistorySet,
   warmup?: WarmupPrescription | null,
+  loadType?: LoadType | null,
 ): boolean {
+  if (isInvalidExternalLoad(set, loadType)) return true;
   if (set.isWarmup === true) return true;
   return matchesWarmupPattern(set, warmup);
 }
@@ -145,6 +164,7 @@ export function bestPRFromHistory(
   entries: HistoryEntry[],
   prType: PRType,
   warmup?: WarmupPrescription | null,
+  loadType?: LoadType | null,
 ): PersonalRecord | null {
   let best: PersonalRecord | null = null;
   const chronological = [...entries].sort((a, b) => a.date.localeCompare(b.date));
@@ -153,7 +173,7 @@ export function bestPRFromHistory(
       a.loggedAt.localeCompare(b.loggedAt),
     );
     for (const set of sets) {
-      if (isExcludedFromPR(set, warmup)) continue;
+      if (isExcludedFromPR(set, warmup, loadType)) continue;
       if (!(set.reps >= 1)) continue;
       const candidate: PRCandidate = {
         weightKg: set.weightKg,
@@ -175,8 +195,9 @@ export function setEstablishesPR(
   previousBest: PersonalRecord | null,
   prType: PRType,
   warmup?: WarmupPrescription | null,
+  loadType?: LoadType | null,
 ): boolean {
-  if (isExcludedFromPR(set, warmup)) return false;
+  if (isExcludedFromPR(set, warmup, loadType)) return false;
   if (!(set.reps >= 1)) return false;
   if (!previousBest) return true;
   return beats({ weightKg: set.weightKg, reps: set.reps, date }, previousBest, prType);

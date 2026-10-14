@@ -24,12 +24,12 @@ export async function loadProgram(): Promise<ProgramRecord> {
 
   if (exercises && assignments && cycleOrder && Object.keys(exercises).length > 0) {
     const stored = { exercises, assignments, cycleOrder };
-    const filled = fillMissingFormTips(stored);
-    if (filled) {
+    const withTips = fillMissingFormTips(stored) ?? stored;
+    const filled = fillMissingLoadTypes(withTips) ?? withTips;
+    if (filled !== stored) {
       await persistProgram(filled);
-      return filled;
     }
-    return stored;
+    return filled;
   }
 
   const seeded = buildProgramFromSeed();
@@ -67,6 +67,26 @@ export function fillMissingFormTips(program: ProgramRecord): ProgramRecord | nul
       cues: seedEx.cues,
       mistakes: current.mistakes.length > 0 ? current.mistakes : seedEx.mistakes,
     };
+    changed = true;
+  }
+  return changed ? { ...program, exercises } : null;
+}
+
+/**
+ * Copy seed `loadType` onto library entries that were stored before the field
+ * existed. Does not touch exerciseHistory. Unknown custom ids stay unset
+ * (no lock / no guard).
+ */
+export function fillMissingLoadTypes(
+  program: ProgramRecord,
+): ProgramRecord | null {
+  const seeded = buildProgramFromSeed();
+  let changed = false;
+  const exercises = { ...program.exercises };
+  for (const [id, seedEx] of Object.entries(seeded.exercises)) {
+    const current = exercises[id];
+    if (!current || current.loadType != null) continue;
+    exercises[id] = { ...current, loadType: seedEx.loadType };
     changed = true;
   }
   return changed ? { ...program, exercises } : null;

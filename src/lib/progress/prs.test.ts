@@ -6,6 +6,7 @@ import {
   beats,
   bestPRFromHistory,
   isExcludedFromPR,
+  isInvalidExternalLoad,
   matchesWarmupPattern,
   setEstablishesPR,
   shouldFlagWarmup,
@@ -310,5 +311,56 @@ describe("setEstablishesPR + history sequence", () => {
     expect(
       setEstablishesPR(set({ weightKg: 50, reps: 0 }), "2026-09-06", null, "weight"),
     ).toBe(false);
+  });
+});
+
+describe("loadType external guard", () => {
+  it("flags external zero load and ignores missing loadType", () => {
+    expect(isInvalidExternalLoad({ weightKg: 0 }, "external")).toBe(true);
+    expect(isInvalidExternalLoad({ weightKg: 20 }, "external")).toBe(false);
+    expect(isInvalidExternalLoad({ weightKg: 0 }, "bodyweight")).toBe(false);
+    expect(isInvalidExternalLoad({ weightKg: 0 }, "assisted")).toBe(false);
+    expect(isInvalidExternalLoad({ weightKg: 0 }, undefined)).toBe(false);
+    expect(isInvalidExternalLoad({ weightKg: 0 }, null)).toBe(false);
+  });
+
+  it("excludes external 0 kg sets from PR history and establishment", () => {
+    const zero = set({ weightKg: 0, reps: 10 });
+    const real = set({ weightKg: 40, reps: 8 });
+    expect(isExcludedFromPR(zero, null, "external")).toBe(true);
+    expect(
+      setEstablishesPR(zero, "2026-09-01", null, "weight", null, "external"),
+    ).toBe(false);
+    expect(
+      bestPRFromHistory(
+        [entry("2026-09-01", [zero]), entry("2026-09-06", [real])],
+        "weight",
+        null,
+        "external",
+      )?.weightKg,
+    ).toBe(40);
+  });
+
+  it("still allows 0 kg bodyweight and assisted PRs", () => {
+    expect(
+      setEstablishesPR(
+        set({ weightKg: 0, reps: 15 }),
+        "2026-09-01",
+        null,
+        "reps",
+        null,
+        "bodyweight",
+      ),
+    ).toBe(true);
+    expect(
+      setEstablishesPR(
+        set({ weightKg: 0, reps: 8 }),
+        "2026-09-01",
+        null,
+        "inverse-weight",
+        null,
+        "assisted",
+      ),
+    ).toBe(true);
   });
 });

@@ -30,6 +30,7 @@ function toLibrary(ex: Exercise): LibraryExercise {
     difficultyTags: ex.difficultyTags,
     icon: ex.icon,
     prType: ex.prType,
+    loadType: ex.loadType,
   };
 }
 
@@ -96,6 +97,7 @@ export function buildProgramFromSeed(): ProgramRecord {
         mistakes: fin.mistakes,
         icon: fin.icon,
         prType: fin.prType,
+        loadType: fin.loadType,
       };
     }
     assignments[fin.day].push({

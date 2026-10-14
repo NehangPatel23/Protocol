@@ -55,10 +55,11 @@ export function formatAvgRpe(rpe: number): string {
 export function sessionWorkingVolumeKg(
   sets: HistorySet[],
   warmup?: Parameters<typeof isWorkingSet>[1],
+  loadType?: Parameters<typeof isWorkingSet>[2],
 ): number {
   let total = 0;
   for (const set of sets) {
-    if (!isWorkingSet(set, warmup)) continue;
+    if (!isWorkingSet(set, warmup, loadType)) continue;
     total += setVolume(set.weightKg, set.reps);
   }
   return total;
@@ -90,7 +91,9 @@ export function historicalPRHitsForDate(
 ): number {
   let hits = 0;
   for (const [exerciseId, entries] of Object.entries(history)) {
-    const prType = program.exercises[exerciseId]?.prType ?? "weight";
+    const lib = program.exercises[exerciseId];
+    const prType = lib?.prType ?? "weight";
+    const loadType = lib?.loadType;
     const chronological = [...entries].sort((a, b) =>
       a.date.localeCompare(b.date),
     );
@@ -101,7 +104,11 @@ export function historicalPRHitsForDate(
         a.loggedAt.localeCompare(b.loggedAt),
       );
       for (const set of sets) {
-        if (!setEstablishesPR(set, entry.date, best, prType, warmup)) continue;
+        if (
+          !setEstablishesPR(set, entry.date, best, prType, warmup, loadType)
+        ) {
+          continue;
+        }
         if (entry.date === date) hits += 1;
         best = toPersonalRecord(
           { weightKg: set.weightKg, reps: set.reps, date: entry.date },
@@ -131,10 +138,11 @@ export function sessionDetailStats(
   let hasWorking = false;
   const allSets: HistorySet[] = [];
   for (const ex of exercises) {
+    const loadType = program.exercises[ex.exerciseId]?.loadType;
     const warmup = warmupPrescriptionFor(program, ex.exerciseId, ex.dayKey);
     for (const set of ex.sets) {
       allSets.push(set);
-      if (!isWorkingSet(set, warmup)) continue;
+      if (!isWorkingSet(set, warmup, loadType)) continue;
       hasWorking = true;
       volumeKg += setVolume(set.weightKg, set.reps);
     }

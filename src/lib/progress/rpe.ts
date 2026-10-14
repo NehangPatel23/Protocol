@@ -4,7 +4,7 @@
  */
 
 import type { HistoryEntry, HistorySet } from "@/lib/db/history";
-import type { ProgramRecord } from "@/lib/program/types";
+import type { LoadType, ProgramRecord } from "@/lib/program/types";
 import { isWorkingSet } from "./volume";
 import { warmupPrescriptionFor, type WarmupPrescription } from "./prs";
 
@@ -25,11 +25,12 @@ export interface RpeTrendPoint {
 export function sessionAverageRpe(
   sets: HistorySet[],
   warmup?: WarmupPrescription | null,
+  loadType?: LoadType | null,
 ): { rpe: number; setCount: number } | null {
   let sum = 0;
   let count = 0;
   for (const set of sets) {
-    if (!isWorkingSet(set, warmup)) continue;
+    if (!isWorkingSet(set, warmup, loadType)) continue;
     const rpe = parseRpe(set.rpe);
     if (rpe == null) continue;
     sum += rpe;
@@ -42,11 +43,12 @@ export function sessionAverageRpe(
 export function rpeTrendForExercise(
   entries: HistoryEntry[],
   warmup?: WarmupPrescription | null,
+  loadType?: LoadType | null,
 ): RpeTrendPoint[] {
   const chronological = [...entries].sort((a, b) => a.date.localeCompare(b.date));
   const points: RpeTrendPoint[] = [];
   for (const entry of chronological) {
-    const avg = sessionAverageRpe(entry.sets, warmup);
+    const avg = sessionAverageRpe(entry.sets, warmup, loadType);
     if (!avg) continue;
     points.push({ date: entry.date, rpe: avg.rpe, setCount: avg.setCount });
   }
@@ -68,7 +70,7 @@ export function rpeTrendSeries(
   for (const [exerciseId, entries] of Object.entries(history)) {
     const lib = program.exercises[exerciseId];
     const warmup = warmupPrescriptionFor(program, exerciseId);
-    const points = rpeTrendForExercise(entries, warmup);
+    const points = rpeTrendForExercise(entries, warmup, lib?.loadType);
     if (points.length === 0) continue;
     series.push({
       exerciseId,

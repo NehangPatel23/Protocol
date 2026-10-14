@@ -6,7 +6,7 @@
 
 import type { HistoryEntry, HistorySet } from "@/lib/db/history";
 import { addLocalDays, daysBetween } from "@/lib/program/cycle";
-import type { MuscleGroup, ProgramRecord } from "@/lib/program/types";
+import type { LoadType, MuscleGroup, ProgramRecord } from "@/lib/program/types";
 import { MUSCLE_LABELS } from "@/lib/program/types";
 import {
   isExcludedFromPR,
@@ -71,8 +71,9 @@ export function inDateRange(
 export function isWorkingSet(
   set: HistorySet,
   warmup?: WarmupPrescription | null,
+  loadType?: LoadType | null,
 ): boolean {
-  if (isExcludedFromPR(set, warmup)) return false;
+  if (isExcludedFromPR(set, warmup, loadType)) return false;
   return set.reps >= 1;
 }
 
@@ -105,7 +106,7 @@ export function volumePerMuscleInRange(
     for (const entry of entries) {
       if (!inDateRange(entry.date, start, end)) continue;
       for (const set of entry.sets) {
-        if (!isWorkingSet(set, warmup)) continue;
+        if (!isWorkingSet(set, warmup, lib.loadType)) continue;
         creditSetToMuscles(
           totals,
           lib.muscles.primary,

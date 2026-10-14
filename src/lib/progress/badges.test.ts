@@ -152,4 +152,19 @@ describe("mergeBadges", () => {
       "ten-sessions",
     ]);
   });
+
+  it("drops stored first-pr when guarded history no longer qualifies", () => {
+    const stored = [
+      { id: "first-pr" as const, earnedDate: "2026-08-01" },
+      { id: "ten-sessions" as const, earnedDate: "2026-09-01" },
+    ];
+    const merged = mergeBadges(
+      [{ id: "ten-sessions", earnedDate: "2026-09-01" }],
+      stored,
+    );
+    expect(merged.find((b) => b.id === "first-pr")).toBeUndefined();
+    expect(merged.find((b) => b.id === "ten-sessions")?.earnedDate).toBe(
+      "2026-09-01",
+    );
+  });
 });

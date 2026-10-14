@@ -236,6 +236,7 @@ export function ActiveSession() {
             <SetLogger
               key={`${exercise.id}-${stepIndex}`}
               prType={exercise.prType}
+              loadType={exercise.loadType}
               lastWeightKg={lastSet?.weightKg}
               lastReps={lastSet?.reps}
               prescribedWeightKg={firstPrescribedKg(assignment.weight)}
